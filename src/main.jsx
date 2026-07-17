@@ -741,8 +741,6 @@ function App() {
             <button type="button" className="secondary-button" onClick={() => persistUser(null)}>{t('logout')}</button>
           </div>
           <LanguageSwitcher />
-          <DefaultClientEditor dashboard={dashboard} run={run} busy={busy} />
-          <RateEditor dashboard={dashboard} run={run} busy={busy} />
         </div>
       </header>
 
@@ -753,6 +751,14 @@ function App() {
         <StatCard tone="success" icon={Banknote} label={t('amountPaid')} value={currencySummary(dashboard.totals.byCurrency, 'paidCents', language)} />
         <StatCard tone="warning" icon={WalletCards} label={t('amountOutstanding')} value={currencySummary(dashboard.totals.byCurrency, 'openCents', language)} />
         <StatCard tone="neutral" icon={Clock3} label={t('workedHours')} value={minutesToLabel(dashboard.totals.workedMinutes)} />
+      </section>
+      <section className="workspace-preferences desktop-preferences" aria-label="Preferências de lançamento">
+        <div className="preferences-heading">
+          <span>Preferências de lançamento</span>
+          <small>Usadas como padrão ao criar um novo serviço.</small>
+        </div>
+        <DefaultClientEditor dashboard={dashboard} run={run} busy={busy} />
+        <RateEditor dashboard={dashboard} run={run} busy={busy} />
       </section>
       <section className={`mobile-quick-settings mobile-pane ${mobileView === 'overview' ? 'mobile-active' : ''}`}>
         <DefaultClientEditor dashboard={dashboard} run={run} busy={busy} />

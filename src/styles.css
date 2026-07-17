@@ -198,7 +198,7 @@ h3 {
   justify-content: space-between;
   gap: 24px;
   margin-bottom: 20px;
-  padding: 24px 28px;
+  padding: 26px 30px;
   border-radius: 14px;
   background: linear-gradient(160deg, #12312d, var(--text) 75%);
   box-shadow: var(--shadow-lg);
@@ -281,8 +281,9 @@ h3 {
 }
 
 .topbar-tools {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(190px, 1fr));
+  display: flex;
+  min-width: 370px;
+  justify-content: flex-end;
   gap: 10px;
   align-items: stretch;
 }
@@ -354,6 +355,55 @@ h3 {
 .language-switcher button.active {
   background: var(--primary);
   color: #fff;
+}
+
+/* ---------- desktop workspace preferences ---------- */
+
+.workspace-preferences {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(250px, .9fr) minmax(220px, .72fr);
+  align-items: center;
+  gap: 14px;
+  margin: -2px 0 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .72);
+  box-shadow: 0 6px 18px rgba(24, 33, 43, .04);
+}
+
+.preferences-heading {
+  display: grid;
+  gap: 2px;
+}
+
+.preferences-heading span {
+  color: var(--text);
+  font-size: .78rem;
+  font-weight: 800;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+
+.preferences-heading small { color: var(--muted); font-size: .78rem; }
+
+.workspace-preferences .top-setting-editor,
+.workspace-preferences .rate-editor {
+  min-width: 0;
+  padding: 8px;
+  border-color: var(--border);
+  background: var(--surface-muted);
+}
+
+.workspace-preferences .top-setting-editor label,
+.workspace-preferences .rate-editor label {
+  color: var(--muted-strong);
+}
+
+.workspace-preferences .top-setting-editor select,
+.workspace-preferences .rate-editor input {
+  border-color: var(--border);
+  background: #fff;
 }
 
 /* ---------- auth: open ledger book ---------- */
@@ -1894,6 +1944,10 @@ h3 {
 /* ---------- responsive ---------- */
 
 @media (max-width: 1120px) {
+  .workspace-preferences {
+    grid-template-columns: minmax(210px, .8fr) minmax(0, 1fr) minmax(0, .8fr);
+  }
+
   .workspace {
     grid-template-columns: 1fr;
   }
@@ -1916,6 +1970,14 @@ h3 {
 
   .topbar-tools {
     justify-items: stretch;
+  }
+
+  .workspace-preferences {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .preferences-heading {
+    grid-column: 1 / -1;
   }
 
   .stats-grid,
@@ -1946,6 +2008,10 @@ h3 {
 @media (max-width: 640px) {
   .app-shell {
     padding: 12px 12px 92px;
+  }
+
+  .desktop-preferences {
+    display: none;
   }
 
   .hero-copy,
