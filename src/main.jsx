@@ -417,15 +417,16 @@ function buildReceiptLines(service, t, language) {
     lines.push(t('noHours'));
   }
 
-  lines.push('', `${t('subtotal')}: ${moneyFor(service.hoursCents)}`);
-  if (service.carryover_cents > 0) lines.push(`${t('carryoverApplied')}: ${moneyFor(service.carryover_cents)}`);
+  lines.push('', `${t('hoursSubtotal')}: ${moneyFor(service.hoursCents)}`);
+  if (service.carryover_cents > 0) lines.push(`${t('carryoverApplied')} (+): + ${moneyFor(service.carryover_cents)}`);
   if (service.adjustmentCents > 0) {
-    lines.push(`${t(service.adjustmentType === 'surcharge' ? 'surcharge' : 'discount')}: ${moneyFor(service.adjustmentCents)}`);
+    const sign = service.adjustmentType === 'surcharge' ? '+' : '−';
+    lines.push(`${t(service.adjustmentType === 'surcharge' ? 'surcharge' : 'discount')} (${sign}): ${sign} ${moneyFor(service.adjustmentCents)}`);
   }
   lines.push(
-    `${t('total')}: ${moneyFor(service.totalCents)}`,
-    `${t('paidTotal')}: ${moneyFor(service.paidCents)}`,
-    `${t('balance')}: ${moneyFor(service.balanceCents)}`,
+    `${t('amountBilled')}: ${moneyFor(service.totalCents)}`,
+    `${t('paymentsApplied')} (−): − ${moneyFor(service.paidCents)}`,
+    `${t('amountDue')}: ${moneyFor(service.balanceCents)}`,
     `${t('open')}: ${service.status === 'open' ? t('open') : service.status === 'paid' ? t('paid') : t('transferred')}`,
     '',
     `${t('issuedAt')}: ${dateTimeLabel(new Date(), language)}`
@@ -666,17 +667,18 @@ function App() {
       {error ? <div className="error">{error}</div> : null}
 
       <section className="stats-grid">
-        <StatCard tone="warning" icon={WalletCards} label={t('open')} value={currencySummary(dashboard.totals.byCurrency, 'openCents', language)} />
-        <StatCard tone="success" icon={Banknote} label={t('paidTotal')} value={currencySummary(dashboard.totals.byCurrency, 'paidCents', language)} />
+        <StatCard tone="neutral" icon={ReceiptText} label={t('amountBilled')} value={currencySummary(dashboard.totals.byCurrency, 'totalCents', language)} />
+        <StatCard tone="success" icon={Banknote} label={t('amountPaid')} value={currencySummary(dashboard.totals.byCurrency, 'paidCents', language)} />
+        <StatCard tone="warning" icon={WalletCards} label={t('amountOutstanding')} value={currencySummary(dashboard.totals.byCurrency, 'openCents', language)} />
         <StatCard tone="neutral" icon={Clock3} label={t('workedHours')} value={minutesToLabel(dashboard.totals.workedMinutes)} />
-        <StatCard
-          tone="warning"
-          icon={Coins}
-          label={t('nextService')}
-          value={centsToMoney(dashboard.settings.pending_carryover_cents, dashboard.settings.pending_carryover_currency || 'BRL', language)}
-          muted={!dashboard.settings.pending_carryover_cents}
-        />
       </section>
+      {dashboard.settings.pending_carryover_cents > 0 ? (
+        <div className="carryover-notice">
+          <Hourglass size={16} />
+          <span>{t('nextService')}</span>
+          <strong>{centsToMoney(dashboard.settings.pending_carryover_cents, dashboard.settings.pending_carryover_currency || 'BRL', language)}</strong>
+        </div>
+      ) : null}
 
       <div className="workspace">
         <aside className="sidebar">
@@ -1196,14 +1198,20 @@ function ServiceDetail({ service, clients, run, busy }) {
         <div className="financial-summary">
           <span className="financial-summary-label">{t('financialSummary')}</span>
           <div className="financial-primary">
-            <span>{t('balance')}</span>
+            <span>{t('amountDue')}</span>
             <strong>{centsToMoney(service.balanceCents, service.currency, language)}</strong>
           </div>
-          <div className="financial-metrics">
-            <span><small>{t('total')}</small><b>{centsToMoney(service.totalCents, service.currency, language)}</b></span>
-            <span><small>{t('paidTotal')}</small><b>{centsToMoney(service.paidCents, service.currency, language)}</b></span>
-            <span><small>{t('gross')}</small><b>{centsToMoney(service.grossCents, service.currency, language)}</b></span>
-            <span><small>{t(service.adjustmentType === 'surcharge' ? 'surcharge' : 'discount')}</small><b>{centsToMoney(service.adjustmentCents, service.currency, language)}</b></span>
+          <div className="financial-ledger">
+            <span><small>{t('hoursSubtotal')}</small><b>{centsToMoney(service.hoursCents, service.currency, language)}</b></span>
+            {service.carryover_cents > 0 ? <span><small>{t('carryoverApplied')} (+)</small><b>+ {centsToMoney(service.carryover_cents, service.currency, language)}</b></span> : null}
+            {service.adjustmentCents > 0 ? (
+              <span className={service.adjustmentType === 'surcharge' ? 'ledger-debit' : 'ledger-credit'}>
+                <small>{t(service.adjustmentType === 'surcharge' ? 'surcharge' : 'discount')} ({service.adjustmentType === 'surcharge' ? '+' : '−'})</small>
+                <b>{service.adjustmentType === 'surcharge' ? '+' : '−'} {centsToMoney(service.adjustmentCents, service.currency, language)}</b>
+              </span>
+            ) : null}
+            <span className="ledger-total"><small>{t('amountBilled')}</small><b>{centsToMoney(service.totalCents, service.currency, language)}</b></span>
+            <span className="ledger-credit"><small>{t('paymentsApplied')} (−)</small><b>− {centsToMoney(service.paidCents, service.currency, language)}</b></span>
           </div>
         </div>
       </section>
@@ -1523,29 +1531,32 @@ function EntriesTable({ service, run, busy }) {
       <h3>{t('serviceHours')}</h3>
       {service.carryover_cents > 0 ? (
         <div className="carry-line">
-          <Hourglass size={16} /> {t('carryoverApplied')}: {centsToMoney(service.carryover_cents, service.currency, language)}
+          <Hourglass size={16} /> {t('carryoverApplied')} (+): {centsToMoney(service.carryover_cents, service.currency, language)}
         </div>
       ) : null}
       {service.adjustmentCents > 0 ? (
         <div className={service.adjustmentType === 'surcharge' ? 'surcharge-line' : 'discount-line'}>
-          <Coins size={16} /> {t(service.adjustmentType === 'surcharge' ? 'surchargeApplied' : 'discountApplied')}: {centsToMoney(service.adjustmentCents, service.currency, language)}
+          <Coins size={16} /> {t(service.adjustmentType === 'surcharge' ? 'surchargeApplied' : 'discountApplied')} ({service.adjustmentType === 'surcharge' ? '+' : '−'}): {centsToMoney(service.adjustmentCents, service.currency, language)}
         </div>
       ) : null}
       {service.entries.length ? service.entries.map((entry) => (
         <div className="table-row" key={entry.id}>
           <span>
-            <strong>{entry.work_date}</strong>
+            <strong>{new Date(`${entry.work_date}T12:00:00`).toLocaleDateString(language === 'en' ? 'en-US' : 'pt-BR')}</strong>
             <small>{entry.start_time} às {entry.end_time} · {minutesToLabel(entry.minutes)}</small>
             {entry.notes ? <small>{entry.notes}</small> : null}
           </span>
-          <button
-            type="button"
-            disabled={busy}
-            title="Remover lançamento"
-            onClick={() => run(() => api(`/api/services/${service.id}/entries/${entry.id}`, { method: 'DELETE' }))}
-          >
-            <Trash2 size={16} />
-          </button>
+          <div className="table-row-actions">
+            <span><strong>{centsToMoney(Math.round((entry.minutes / 60) * service.rate_cents), service.currency, language)}</strong><small>{minutesToLabel(entry.minutes)} × {centsToMoney(service.rate_cents, service.currency, language)}/h</small></span>
+            <button
+              type="button"
+              disabled={busy}
+              title="Remover lançamento"
+              onClick={() => run(() => api(`/api/services/${service.id}/entries/${entry.id}`, { method: 'DELETE' }))}
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
         </div>
       )) : <p className="empty-text">{t('noHours')}</p>}
     </section>
