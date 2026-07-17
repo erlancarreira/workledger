@@ -897,8 +897,14 @@ h3 {
 .portal-service-heading,
 .portal-service-values {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+
+.portal-service-heading > .badge {
+  flex: 0 0 auto;
+  align-self: flex-start;
 }
 
 .portal-service-heading h2 {
@@ -973,6 +979,14 @@ h3 {
   background: #f8fafb;
 }
 
+.portal-debit b {
+  color: #9a4d00;
+}
+
+.portal-credit b {
+  color: #28705f;
+}
+
 .portal-breakdown-balance {
   color: var(--primary-strong);
   background: #eef9f6;
@@ -981,6 +995,15 @@ h3 {
 .portal-work > span > span {
   display: grid;
   gap: 2px;
+}
+
+.portal-entry-value {
+  justify-items: end;
+  text-align: right;
+}
+
+.portal-entry-value small {
+  font-size: 0.68rem;
 }
 
 .portal-payments {

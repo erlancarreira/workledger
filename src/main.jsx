@@ -51,8 +51,8 @@ const messages = {
     currency: 'Moeda',
     initialDiscount: 'Ajuste inicial',
     adjustmentType: 'Tipo de ajuste',
-    discountOption: 'Débito',
-    surchargeOption: 'Crédito',
+    discountOption: 'Crédito — reduz o total',
+    surchargeOption: 'Débito — aumenta o total',
     notes: 'Observações',
     serviceNotesPlaceholder: 'Detalhes importantes do serviço',
     clientNamePlaceholder: 'Nome do cliente',
@@ -97,8 +97,8 @@ const messages = {
     subtotal: 'Subtotal',
     total: 'Total',
     gross: 'Bruto',
-    discount: 'Débito',
-    surcharge: 'Crédito',
+    discount: 'Crédito',
+    surcharge: 'Débito',
     balance: 'Saldo',
     serviceData: 'Dados do serviço',
     hourlyRate: 'Valor da hora',
@@ -112,9 +112,12 @@ const messages = {
     settle: 'Baixar',
     serviceHours: 'Horas do serviço',
     carryoverApplied: 'Saldo anterior aplicado',
-    discountApplied: 'Débito aplicado',
-    surchargeApplied: 'Crédito aplicado',
+    discountApplied: 'Crédito aplicado',
+    surchargeApplied: 'Débito aplicado',
     financialSummary: 'Resumo financeiro',
+    hoursSubtotal: 'Subtotal de horas',
+    paymentsApplied: 'Pagamentos recebidos',
+    amountDue: 'Saldo em aberto',
     noHours: 'Nenhuma hora lançada.',
     payments: 'Pagamentos',
     noPayments: 'Nenhum pagamento registrado.',
@@ -178,8 +181,8 @@ const messages = {
     currency: 'Currency',
     initialDiscount: 'Initial adjustment',
     adjustmentType: 'Adjustment type',
-    discountOption: 'Debit',
-    surchargeOption: 'Credit',
+    discountOption: 'Credit — reduces total',
+    surchargeOption: 'Debit — increases total',
     notes: 'Notes',
     serviceNotesPlaceholder: 'Important service details',
     clientNamePlaceholder: 'Client name',
@@ -224,8 +227,8 @@ const messages = {
     subtotal: 'Subtotal',
     total: 'Total',
     gross: 'Gross',
-    discount: 'Debit',
-    surcharge: 'Credit',
+    discount: 'Credit',
+    surcharge: 'Debit',
     balance: 'Balance',
     serviceData: 'Service details',
     hourlyRate: 'Hourly rate',
@@ -239,9 +242,12 @@ const messages = {
     settle: 'Settle',
     serviceHours: 'Service hours',
     carryoverApplied: 'Previous balance applied',
-    discountApplied: 'Debit applied',
-    surchargeApplied: 'Credit applied',
+    discountApplied: 'Credit applied',
+    surchargeApplied: 'Debit applied',
     financialSummary: 'Financial summary',
+    hoursSubtotal: 'Hours subtotal',
+    paymentsApplied: 'Payments received',
+    amountDue: 'Amount due',
     noHours: 'No hours logged.',
     payments: 'Payments',
     noPayments: 'No payments registered.',
@@ -520,20 +526,24 @@ function ClientPortal({ token }) {
             <div className="portal-service-body">
               <div className="portal-breakdown">
                 <strong>{t('financialComposition')}</strong>
-                <span><small>{t('hourlyRate')}</small><b>{centsToMoney(service.rate_cents, service.currency, language)}</b></span>
-                <span><small>{t('serviceHours')}</small><b>{centsToMoney(service.hoursCents, service.currency, language)}</b></span>
-                {service.carryover_cents > 0 ? <span><small>{t('carryoverApplied')}</small><b>{centsToMoney(service.carryover_cents, service.currency, language)}</b></span> : null}
-                <span><small>{t(service.adjustmentType === 'surcharge' ? 'surcharge' : 'discount')}</small><b>{centsToMoney(service.adjustmentCents, service.currency, language)}</b></span>
-                <span className="portal-breakdown-total"><small>{t('total')}</small><b>{centsToMoney(service.totalCents, service.currency, language)}</b></span>
-                <span><small>{t('paidTotal')}</small><b>{centsToMoney(service.paidCents, service.currency, language)}</b></span>
-                <span className="portal-breakdown-balance"><small>{t('balance')}</small><b>{centsToMoney(service.balanceCents, service.currency, language)}</b></span>
+                <span><small>{t('hoursSubtotal')}</small><b>{centsToMoney(service.hoursCents, service.currency, language)}</b></span>
+                {service.carryover_cents > 0 ? <span><small>{t('carryoverApplied')} (+)</small><b>+ {centsToMoney(service.carryover_cents, service.currency, language)}</b></span> : null}
+                {service.adjustmentCents > 0 ? (
+                  <span className={service.adjustmentType === 'surcharge' ? 'portal-debit' : 'portal-credit'}>
+                    <small>{t(service.adjustmentType === 'surcharge' ? 'surcharge' : 'discount')} ({service.adjustmentType === 'surcharge' ? '+' : '−'})</small>
+                    <b>{service.adjustmentType === 'surcharge' ? '+' : '−'} {centsToMoney(service.adjustmentCents, service.currency, language)}</b>
+                  </span>
+                ) : null}
+                <span className="portal-breakdown-total"><small>{t('amountBilled')}</small><b>{centsToMoney(service.totalCents, service.currency, language)}</b></span>
+                <span className="portal-credit"><small>{t('paymentsApplied')} (−)</small><b>− {centsToMoney(service.paidCents, service.currency, language)}</b></span>
+                <span className="portal-breakdown-balance"><small>{t('amountDue')}</small><b>{centsToMoney(service.balanceCents, service.currency, language)}</b></span>
               </div>
               <div className="portal-work">
                 <strong>{t('workHistory')}</strong>
                 {service.entries.length ? service.entries.map((entry) => (
                   <span key={entry.id}>
                     <span>{new Date(`${entry.work_date}T12:00:00`).toLocaleDateString(language === 'en' ? 'en-US' : 'pt-BR')}<small>{entry.start_time}–{entry.end_time} · {minutesToLabel(entry.minutes)}</small></span>
-                    <b>{centsToMoney(Math.round((entry.minutes / 60) * service.rate_cents), service.currency, language)}</b>
+                    <span className="portal-entry-value"><b>{centsToMoney(Math.round((entry.minutes / 60) * service.rate_cents), service.currency, language)}</b><small>{minutesToLabel(entry.minutes)} × {centsToMoney(service.rate_cents, service.currency, language)}/h</small></span>
                   </span>
                 )) : <small>{t('noHours')}</small>}
               </div>
