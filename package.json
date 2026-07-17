@@ -12,8 +12,8 @@
     "start": "node --env-file=.env server/index.js"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
     "@vitejs/plugin-react": "^5.0.0",
-    "better-sqlite3": "^11.10.0",
     "concurrently": "^9.2.0",
     "express": "^4.19.2",
     "html-to-image": "^1.11.13",

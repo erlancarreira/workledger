@@ -1,207 +1,142 @@
-import Database from 'better-sqlite3';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { neon } from '@neondatabase/serverless';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.join(__dirname, '..', 'data.sqlite');
+const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+if (!connectionString) throw new Error('DATABASE_URL não configurada.');
 
-export const db = new Database(dbPath);
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+export const sql = neon(connectionString);
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    email TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL,
-    password_salt TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS user_settings (
-    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    default_rate_cents INTEGER NOT NULL DEFAULT 15000,
-    default_client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
-    pending_carryover_cents INTEGER NOT NULL DEFAULT 0,
-    pending_carryover_currency TEXT NOT NULL DEFAULT 'BRL'
-  );
-
-  CREATE TABLE IF NOT EXISTS settings (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
-    default_rate_cents INTEGER NOT NULL,
-    pending_carryover_cents INTEGER NOT NULL DEFAULT 0,
-    pending_carryover_currency TEXT NOT NULL DEFAULT 'BRL'
-  );
-
-  CREATE TABLE IF NOT EXISTS services (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    title TEXT NOT NULL,
-    client_id INTEGER REFERENCES clients(id) ON DELETE SET NULL,
-    client TEXT NOT NULL DEFAULT '',
-    notes TEXT NOT NULL DEFAULT '',
-    service_date TEXT NOT NULL DEFAULT '',
-    service_time TEXT NOT NULL DEFAULT '',
-    currency TEXT NOT NULL DEFAULT 'BRL',
-    rate_cents INTEGER NOT NULL,
-    carryover_cents INTEGER NOT NULL DEFAULT 0,
-    discount_cents INTEGER NOT NULL DEFAULT 0,
-    adjustment_type TEXT NOT NULL DEFAULT 'discount',
-    status TEXT NOT NULL DEFAULT 'open',
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS clients (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    notes TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS time_entries (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    service_id INTEGER NOT NULL REFERENCES services(id) ON DELETE CASCADE,
-    work_date TEXT NOT NULL,
-    start_time TEXT NOT NULL,
-    end_time TEXT NOT NULL,
-    minutes INTEGER NOT NULL,
-    notes TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-  );
-
-  CREATE TABLE IF NOT EXISTS payments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    service_id INTEGER NOT NULL REFERENCES services(id) ON DELETE CASCADE,
-    amount_cents INTEGER NOT NULL,
-    notes TEXT NOT NULL DEFAULT '',
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-  );
-`);
-
-db.prepare(`
-  INSERT OR IGNORE INTO settings (id, default_rate_cents, pending_carryover_cents)
-  VALUES (1, 15000, 0)
-`).run();
-
-function ensureColumn(table, column, definition) {
-  const columns = db.prepare(`PRAGMA table_info(${table})`).all();
-  if (!columns.some((item) => item.name === column)) {
-    db.prepare(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`).run();
-  }
+let schemaPromise;
+export function ensureSchema() {
+  schemaPromise ||= (async () => {
+    await sql`CREATE TABLE IF NOT EXISTS users (
+      id BIGSERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      password_salt TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+    await sql`CREATE TABLE IF NOT EXISTS clients (
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      notes TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+    await sql`CREATE TABLE IF NOT EXISTS user_settings (
+      user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      default_rate_cents INTEGER NOT NULL DEFAULT 15000,
+      default_client_id BIGINT REFERENCES clients(id) ON DELETE SET NULL,
+      pending_carryover_cents INTEGER NOT NULL DEFAULT 0,
+      pending_carryover_currency TEXT NOT NULL DEFAULT 'BRL'
+    )`;
+    await sql`CREATE TABLE IF NOT EXISTS services (
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      title TEXT NOT NULL,
+      client_id BIGINT REFERENCES clients(id) ON DELETE SET NULL,
+      client TEXT NOT NULL DEFAULT '',
+      notes TEXT NOT NULL DEFAULT '',
+      service_date TEXT NOT NULL DEFAULT '',
+      service_time TEXT NOT NULL DEFAULT '',
+      currency TEXT NOT NULL DEFAULT 'BRL',
+      rate_cents INTEGER NOT NULL,
+      carryover_cents INTEGER NOT NULL DEFAULT 0,
+      discount_cents INTEGER NOT NULL DEFAULT 0,
+      adjustment_type TEXT NOT NULL DEFAULT 'discount',
+      status TEXT NOT NULL DEFAULT 'open',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+    await sql`CREATE TABLE IF NOT EXISTS time_entries (
+      id BIGSERIAL PRIMARY KEY,
+      service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+      work_date TEXT NOT NULL,
+      start_time TEXT NOT NULL,
+      end_time TEXT NOT NULL,
+      minutes INTEGER NOT NULL,
+      notes TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+    await sql`CREATE TABLE IF NOT EXISTS payments (
+      id BIGSERIAL PRIMARY KEY,
+      service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+      amount_cents INTEGER NOT NULL,
+      notes TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+  })();
+  return schemaPromise;
 }
 
-ensureColumn('services', 'service_date', "TEXT NOT NULL DEFAULT ''");
-ensureColumn('services', 'service_time', "TEXT NOT NULL DEFAULT ''");
-ensureColumn('services', 'client_id', 'INTEGER REFERENCES clients(id) ON DELETE SET NULL');
-ensureColumn('services', 'discount_cents', 'INTEGER NOT NULL DEFAULT 0');
-ensureColumn('services', 'currency', "TEXT NOT NULL DEFAULT 'BRL'");
-ensureColumn('services', 'user_id', 'INTEGER REFERENCES users(id) ON DELETE CASCADE');
-ensureColumn('clients', 'user_id', 'INTEGER REFERENCES users(id) ON DELETE CASCADE');
-ensureColumn('settings', 'pending_carryover_currency', "TEXT NOT NULL DEFAULT 'BRL'");
-ensureColumn('user_settings', 'default_client_id', 'INTEGER REFERENCES clients(id) ON DELETE SET NULL');
-ensureColumn('services', 'adjustment_type', "TEXT NOT NULL DEFAULT 'discount'");
-
 export function centsFromReais(value) {
-  const raw = String(value ?? '').trim();
-  const cleaned = raw.replace(/[^\d,.-]/g, '');
-  const normalizedText = cleaned.includes(',') ? cleaned.replace(/\./g, '').replace(',', '.') : cleaned;
-  const normalized = Number(normalizedText);
-  if (!Number.isFinite(normalized) || normalized < 0) return null;
-  return Math.round(normalized * 100);
+  const cleaned = String(value ?? '').trim().replace(/[^\d,.-]/g, '');
+  const normalized = Number(cleaned.includes(',') ? cleaned.replace(/\./g, '').replace(',', '.') : cleaned);
+  return Number.isFinite(normalized) && normalized >= 0 ? Math.round(normalized * 100) : null;
 }
 
 export function minutesBetween(startTime, endTime) {
-  const [startHour, startMinute] = startTime.split(':').map(Number);
-  const [endHour, endMinute] = endTime.split(':').map(Number);
-  const start = startHour * 60 + startMinute;
-  const end = endHour * 60 + endMinute;
-  return end - start;
+  const [sh, sm] = startTime.split(':').map(Number);
+  const [eh, em] = endTime.split(':').map(Number);
+  return eh * 60 + em - (sh * 60 + sm);
 }
 
-function decorateService(service, userId) {
-  const clientRecord = service.client_id
-    ? db.prepare('SELECT * FROM clients WHERE id = ? AND user_id = ?').get(service.client_id, userId)
-    : null;
+export async function ensureUserSettings(userId) {
+  await sql`INSERT INTO user_settings (user_id) VALUES (${userId}) ON CONFLICT (user_id) DO NOTHING`;
+}
 
-  const entries = db.prepare(`
-    SELECT * FROM time_entries
-    WHERE service_id = ?
-    ORDER BY work_date DESC, start_time DESC, id DESC
-  `).all(service.id);
+export async function getSettings(userId) {
+  await ensureUserSettings(userId);
+  const [settings] = await sql`SELECT * FROM user_settings WHERE user_id = ${userId}`;
+  return settings;
+}
 
-  const payments = db.prepare(`
-    SELECT * FROM payments
-    WHERE service_id = ?
-    ORDER BY created_at DESC, id DESC
-  `).all(service.id);
+export async function getClients(userId) {
+  return sql`SELECT * FROM clients WHERE user_id = ${userId} ORDER BY LOWER(name), id`;
+}
 
-  const workedMinutes = entries.reduce((total, entry) => total + entry.minutes, 0);
-  const hoursCents = Math.round((workedMinutes / 60) * service.rate_cents);
-  const paidCents = payments.reduce((total, payment) => total + payment.amount_cents, 0);
-  const grossCents = hoursCents + service.carryover_cents;
-  const adjustmentCents = service.discount_cents || 0;
-  const adjustmentType = service.adjustment_type === 'surcharge' ? 'surcharge' : 'discount';
+async function decorateService(service, userId) {
+  const [clientRecord, entries, payments] = await Promise.all([
+    service.client_id
+      ? sql`SELECT * FROM clients WHERE id = ${service.client_id} AND user_id = ${userId}`.then((rows) => rows[0] || null)
+      : null,
+    sql`SELECT * FROM time_entries WHERE service_id = ${service.id} ORDER BY work_date DESC, start_time DESC, id DESC`,
+    sql`SELECT * FROM payments WHERE service_id = ${service.id} ORDER BY created_at DESC, id DESC`
+  ]);
+  const workedMinutes = entries.reduce((sum, item) => sum + item.minutes, 0);
+  const paidCents = payments.reduce((sum, item) => sum + item.amount_cents, 0);
+  const grossCents = Math.round((workedMinutes / 60) * service.rate_cents) + service.carryover_cents;
   const totalCents = Math.max(
-    adjustmentType === 'surcharge' ? grossCents + adjustmentCents : grossCents - adjustmentCents,
+    service.adjustment_type === 'surcharge'
+      ? grossCents + service.discount_cents
+      : grossCents - service.discount_cents,
     0
   );
-  const balanceCents = Math.max(totalCents - paidCents, 0);
-
   return {
     ...service,
+    clientRecord,
     entries,
     payments,
-    clientRecord,
-    clientName: clientRecord?.name || service.client || '',
     workedMinutes,
-    hoursCents,
     grossCents,
-    adjustmentCents,
-    adjustmentType,
-    paidCents,
     totalCents,
-    balanceCents
+    paidCents,
+    balanceCents: Math.max(totalCents - paidCents, 0)
   };
 }
 
-export function ensureUserSettings(userId) {
-  db.prepare(`
-    INSERT OR IGNORE INTO user_settings (user_id, default_rate_cents, pending_carryover_cents, pending_carryover_currency)
-    VALUES (?, 15000, 0, 'BRL')
-  `).run(userId);
+export async function getServices(userId) {
+  const services = await sql`SELECT * FROM services WHERE user_id = ${userId} ORDER BY service_date DESC, service_time DESC, id DESC`;
+  return Promise.all(services.map((service) => decorateService(service, userId)));
 }
 
-export function getSettings(userId) {
-  ensureUserSettings(userId);
-  return db.prepare('SELECT * FROM user_settings WHERE user_id = ?').get(userId);
-}
-
-export function getClients(userId) {
-  return db.prepare('SELECT * FROM clients WHERE user_id = ? ORDER BY name COLLATE NOCASE ASC, id ASC').all(userId);
-}
-
-export function getServices(userId) {
-  return db.prepare(`
-    SELECT * FROM services
-    WHERE user_id = ?
-    ORDER BY service_date DESC, service_time DESC, created_at DESC, id DESC
-  `)
-    .all(userId)
-    .map((service) => decorateService(service, userId));
-}
-
-export function getService(id, userId) {
-  const service = db.prepare('SELECT * FROM services WHERE id = ? AND user_id = ?').get(id, userId);
+export async function getService(id, userId) {
+  const [service] = await sql`SELECT * FROM services WHERE id = ${id} AND user_id = ${userId}`;
   return service ? decorateService(service, userId) : null;
 }
 
-export function updateComputedStatus(serviceId, userId) {
-  const service = getService(serviceId, userId);
-  if (!service) return null;
-  if (service.status === 'transferred') return service;
-  const nextStatus = service.balanceCents <= 0 && service.totalCents > 0 ? 'paid' : 'open';
-  db.prepare('UPDATE services SET status = ? WHERE id = ? AND user_id = ?').run(nextStatus, serviceId, userId);
-  return getService(serviceId, userId);
+export async function updateComputedStatus(serviceId, userId) {
+  const service = await getService(serviceId, userId);
+  if (!service || service.status === 'transferred') return;
+  const status = service.balanceCents <= 0 && service.totalCents > 0 ? 'paid' : 'open';
+  await sql`UPDATE services SET status = ${status} WHERE id = ${serviceId} AND user_id = ${userId}`;
 }
