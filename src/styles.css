@@ -1064,6 +1064,63 @@ h3 {
   gap: 10px;
 }
 
+.adjustment-toggle {
+  width: 100%;
+  justify-content: flex-start;
+  min-height: 42px;
+  color: var(--primary-strong);
+  background: #f4faf8;
+  border: 1px dashed #9dcfc7;
+  box-shadow: none;
+}
+
+.adjustment-toggle:hover:not(:disabled) {
+  color: #fff;
+  background: var(--primary);
+  border-color: var(--primary);
+  box-shadow: none;
+  transform: none;
+}
+
+.adjustment-panel {
+  display: grid;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid #cfe1de;
+  border-radius: 10px;
+  background: #f7fbfa;
+}
+
+.adjustment-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.adjustment-panel-heading > span {
+  display: grid;
+  gap: 3px;
+}
+
+.adjustment-panel-heading strong {
+  font-size: 0.78rem;
+}
+
+.adjustment-panel-heading small {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.adjustment-panel-heading button {
+  min-height: 30px;
+  padding: 5px 8px;
+  color: var(--danger);
+  background: transparent;
+  border: 1px solid #edcbc4;
+  font-size: 0.68rem;
+}
+
 .primary-button {
   width: 100%;
   background: var(--primary);
