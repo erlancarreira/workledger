@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { toBlob, toPng } from 'html-to-image';
 import {
+  ArrowLeft,
   Banknote,
   CalendarDays,
   Check,
@@ -133,6 +134,8 @@ const messages = {
     hoursSubtotal: 'Subtotal de horas',
     paymentsApplied: 'Pagamentos recebidos',
     amountDue: 'Saldo em aberto',
+    overview: 'Resumo',
+    backToServices: 'Voltar aos serviços',
     noHours: 'Nenhuma hora lançada.',
     payments: 'Pagamentos',
     noPayments: 'Nenhum pagamento registrado.',
@@ -278,6 +281,8 @@ const messages = {
     hoursSubtotal: 'Hours subtotal',
     paymentsApplied: 'Payments received',
     amountDue: 'Amount due',
+    overview: 'Overview',
+    backToServices: 'Back to services',
     noHours: 'No hours logged.',
     payments: 'Payments',
     noPayments: 'No payments registered.',
@@ -619,6 +624,8 @@ function App() {
   const [selectedId, setSelectedId] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [mobileView, setMobileView] = useState('services');
+  const [mobileDetail, setMobileDetail] = useState(false);
   const t = (key) => messages[language]?.[key] || messages.pt[key] || key;
   const portalToken = new URLSearchParams(window.location.search).get('client_portal');
 
@@ -714,14 +721,18 @@ function App() {
 
       {error ? <div className="error">{error}</div> : null}
 
-      <section className="stats-grid">
+      <section className={`stats-grid mobile-pane ${mobileView === 'overview' ? 'mobile-active' : ''}`}>
         <StatCard tone="neutral" icon={ReceiptText} label={t('amountBilled')} value={currencySummary(dashboard.totals.byCurrency, 'totalCents', language)} />
         <StatCard tone="success" icon={Banknote} label={t('amountPaid')} value={currencySummary(dashboard.totals.byCurrency, 'paidCents', language)} />
         <StatCard tone="warning" icon={WalletCards} label={t('amountOutstanding')} value={currencySummary(dashboard.totals.byCurrency, 'openCents', language)} />
         <StatCard tone="neutral" icon={Clock3} label={t('workedHours')} value={minutesToLabel(dashboard.totals.workedMinutes)} />
       </section>
+      <section className={`mobile-quick-settings mobile-pane ${mobileView === 'overview' ? 'mobile-active' : ''}`}>
+        <DefaultClientEditor dashboard={dashboard} run={run} busy={busy} />
+        <RateEditor dashboard={dashboard} run={run} busy={busy} />
+      </section>
       {dashboard.settings.pending_carryover_cents > 0 ? (
-        <div className="carryover-notice">
+        <div className={`carryover-notice mobile-pane ${mobileView === 'overview' ? 'mobile-active' : ''}`}>
           <Hourglass size={16} />
           <span>{t('nextService')}</span>
           <strong>{centsToMoney(dashboard.settings.pending_carryover_cents, dashboard.settings.pending_carryover_currency || 'BRL', language)}</strong>
@@ -730,19 +741,51 @@ function App() {
 
       <div className="workspace">
         <aside className="sidebar">
-          <NewServiceForm dashboard={dashboard} run={run} busy={busy} onCreated={setSelectedId} />
-          <ClientManager clients={dashboard.clients} run={run} busy={busy} />
+          <div className={`mobile-pane ${mobileView === 'new' ? 'mobile-active' : ''}`}>
+            <NewServiceForm dashboard={dashboard} run={run} busy={busy} onCreated={(id) => {
+              setSelectedId(id);
+              setMobileView('services');
+              setMobileDetail(true);
+            }} />
+          </div>
+          <div className={`mobile-pane ${mobileView === 'clients' ? 'mobile-active' : ''}`}>
+            <ClientManager clients={dashboard.clients} run={run} busy={busy} />
+          </div>
         </aside>
 
-        <section className="detail-panel">
-          <ServiceList services={dashboard.services} selected={selected} onSelect={setSelectedId} />
-          {selected ? (
-            <ServiceDetail service={selected} clients={dashboard.clients} run={run} busy={busy} />
-          ) : (
-            <div className="empty-state">{t('createFirst')}</div>
-          )}
+        <section className={`detail-panel mobile-pane ${mobileView === 'services' ? 'mobile-active' : ''}`}>
+          <div className={`mobile-service-list ${mobileDetail ? 'mobile-hidden' : ''}`}>
+            <ServiceList services={dashboard.services} selected={selected} onSelect={(id) => {
+              setSelectedId(id);
+              setMobileDetail(true);
+            }} />
+          </div>
+          <div className={`mobile-service-detail ${mobileDetail ? 'mobile-shown' : ''}`}>
+            <button type="button" className="mobile-back-button" onClick={() => setMobileDetail(false)}>
+              <ArrowLeft size={17} /> {t('backToServices')}
+            </button>
+            {selected ? (
+              <ServiceDetail service={selected} clients={dashboard.clients} run={run} busy={busy} />
+            ) : (
+              <div className="empty-state">{t('createFirst')}</div>
+            )}
+          </div>
         </section>
       </div>
+      <nav className="mobile-nav" aria-label="Navegação principal">
+        <button type="button" className={mobileView === 'overview' ? 'active' : ''} onClick={() => { setMobileView('overview'); setMobileDetail(false); }}>
+          <WalletCards size={19} /><span>{t('overview')}</span>
+        </button>
+        <button type="button" className={mobileView === 'services' ? 'active' : ''} onClick={() => { setMobileView('services'); setMobileDetail(false); }}>
+          <ReceiptText size={19} /><span>{t('services')}</span>
+        </button>
+        <button type="button" className={mobileView === 'new' ? 'active' : ''} onClick={() => { setMobileView('new'); setMobileDetail(false); }}>
+          <Plus size={19} /><span>{t('newService')}</span>
+        </button>
+        <button type="button" className={mobileView === 'clients' ? 'active' : ''} onClick={() => { setMobileView('clients'); setMobileDetail(false); }}>
+          <Users size={19} /><span>{t('clients')}</span>
+        </button>
+      </nav>
     </main>
     </I18nContext.Provider>
   );

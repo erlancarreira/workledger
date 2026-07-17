@@ -1024,6 +1024,12 @@ h3 {
   font-size: 0.68rem;
 }
 
+.mobile-nav,
+.mobile-back-button,
+.mobile-quick-settings {
+  display: none;
+}
+
 .portal-payments {
   display: grid;
   gap: 8px;
@@ -1819,11 +1825,10 @@ h3 {
 
 @media (max-width: 640px) {
   .app-shell {
-    padding: 14px;
+    padding: 12px 12px 92px;
   }
 
   .hero-copy,
-  .rate-editor,
   .stats-grid,
   .workspace,
   .detail-grid,
@@ -1831,6 +1836,167 @@ h3 {
   .service-edit-form,
   .inline-fields {
     grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    gap: 14px;
+    padding: 18px;
+  }
+
+  .topbar .subtitle,
+  .topbar-tools > .top-setting-editor,
+  .topbar-tools > .rate-editor {
+    display: none;
+  }
+
+  .topbar-tools {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .session-card {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .workspace,
+  .sidebar {
+    display: contents;
+  }
+
+  .mobile-pane:not(.mobile-active) {
+    display: none !important;
+  }
+
+  .stats-grid.mobile-active {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .stat-card {
+    min-height: 108px;
+    padding: 14px;
+  }
+
+  .mobile-quick-settings.mobile-active {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+  }
+
+  .mobile-quick-settings .top-setting-editor,
+  .mobile-quick-settings .rate-editor {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    padding: 10px;
+    border-radius: 8px;
+    background: var(--pen);
+  }
+
+  .mobile-service-detail {
+    display: none;
+  }
+
+  .mobile-service-detail.mobile-shown {
+    display: block;
+  }
+
+  .mobile-service-list.mobile-hidden {
+    display: none;
+  }
+
+  .mobile-back-button {
+    display: flex;
+    width: max-content;
+    margin-bottom: 10px;
+    padding: 8px 10px;
+    color: var(--primary-strong);
+    background: #fff;
+    border: 1px solid var(--border);
+    box-shadow: none;
+  }
+
+  .mobile-nav {
+    position: fixed;
+    z-index: 40;
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    padding: 7px;
+    border: 1px solid var(--border);
+    border-radius: 15px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 18px 50px rgba(16, 35, 43, 0.22);
+    backdrop-filter: blur(16px);
+  }
+
+  .mobile-nav button {
+    display: grid;
+    justify-items: center;
+    gap: 3px;
+    min-width: 0;
+    min-height: 50px;
+    padding: 7px 3px;
+    border: 0;
+    border-radius: 10px;
+    color: var(--muted-strong);
+    background: transparent;
+    box-shadow: none;
+    font-size: 0.62rem;
+  }
+
+  .mobile-nav button.active {
+    color: #fff;
+    background: var(--primary);
+  }
+
+  .mobile-nav span {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .service-list {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-header {
+    padding: 18px;
+  }
+
+  .financial-summary {
+    width: 100%;
+  }
+
+  .detail-actions button {
+    width: 100%;
+  }
+
+  .table-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .table-row-actions {
+    width: 100%;
+    justify-content: space-between;
+    text-align: left;
+  }
+
+  .table-row-actions > span {
+    justify-items: start;
   }
 
   .product-mark {
