@@ -5,6 +5,12 @@ dist/
 .env.*
 !.env.example
 
+# Chaves privadas e certificados
+*.pem
+*.key
+*.p12
+*.pfx
+
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
