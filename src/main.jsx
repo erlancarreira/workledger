@@ -9,6 +9,8 @@ import {
   Coins,
   Copy,
   Download,
+  Eye,
+  EyeOff,
   Pencil,
   Hourglass,
   Plus,
@@ -126,6 +128,8 @@ const messages = {
     email: 'E-mail',
     password: 'Senha',
     newPassword: 'Nova senha',
+    confirmPassword: 'Confirmar senha',
+    passwordMismatch: 'As senhas não coincidem.',
     authName: 'Nome',
     loginSubtitle: 'Entre para acessar seus serviços, clientes e pagamentos.',
     registerSubtitle: 'Crie sua conta local para manter seus dados separados.',
@@ -238,6 +242,8 @@ const messages = {
     email: 'Email',
     password: 'Password',
     newPassword: 'New password',
+    confirmPassword: 'Confirm password',
+    passwordMismatch: 'Passwords do not match.',
     authName: 'Name',
     loginSubtitle: 'Sign in to access your services, clients, and payments.',
     registerSubtitle: 'Create a local account to keep your data separated.',
@@ -565,9 +571,11 @@ function AuthScreen({ onAuth }) {
   const { t } = useI18n();
   const resetToken = new URLSearchParams(window.location.search).get('reset_token');
   const [mode, setMode] = useState(resetToken ? 'recover' : 'login');
-  const [form, setForm] = useState({ name: '', email: '', password: '' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   const modeTitle = mode === 'login' ? t('login') : mode === 'register' ? t('register') : t('recover');
   const modeSubtitle = mode === 'login' ? t('loginSubtitle') : mode === 'register' ? t('registerSubtitle') : t('recoverSubtitle');
@@ -577,6 +585,9 @@ function AuthScreen({ onAuth }) {
     setBusy(true);
     setError('');
     try {
+      if (mode === 'recover' && form.password !== form.confirmPassword) {
+        throw new Error(t('passwordMismatch'));
+      }
       const endpoint = mode === 'login' ? '/api/auth/login' : mode === 'register' ? '/api/auth/register' : '/api/auth/recover';
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -640,8 +651,25 @@ function AuthScreen({ onAuth }) {
 
             <label className="field">
               <span>{mode === 'recover' ? t('newPassword') : t('password')}</span>
-              <input type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} />
+              <div className="password-field">
+                <input type={showPassword ? 'text' : 'password'} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} />
+                <button type="button" aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'} onClick={() => setShowPassword(!showPassword)}>
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </label>
+
+            {mode === 'recover' ? (
+              <label className="field">
+                <span>{t('confirmPassword')}</span>
+                <div className="password-field">
+                  <input type={showConfirmation ? 'text' : 'password'} value={form.confirmPassword} onChange={(event) => setForm({ ...form, confirmPassword: event.target.value })} />
+                  <button type="button" aria-label={showConfirmation ? 'Ocultar senha' : 'Mostrar senha'} onClick={() => setShowConfirmation(!showConfirmation)}>
+                    {showConfirmation ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </label>
+            ) : null}
 
             <button className="primary-button" type="submit" disabled={busy}>{modeTitle}</button>
           </form>

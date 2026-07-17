@@ -698,6 +698,28 @@ h3 {
   text-transform: uppercase;
 }
 
+.password-field {
+  position: relative;
+}
+
+.password-field input {
+  width: 100%;
+  padding-right: 2.75rem;
+}
+
+.password-field button {
+  position: absolute;
+  top: 50%;
+  right: 0.65rem;
+  display: grid;
+  padding: 0.25rem;
+  border: 0;
+  color: var(--muted-strong);
+  background: transparent;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
 .inline-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
