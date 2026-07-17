@@ -1082,8 +1082,7 @@ function ClientManager({ clients, run, busy }) {
                 onClick={async () => {
                   try {
                     const result = await api(`/api/clients/${client.id}/share-link`, { method: 'POST' });
-                    const link = `${window.location.origin}/?client_portal=${encodeURIComponent(result.token)}`;
-                    await navigator.clipboard.writeText(link);
+                    await navigator.clipboard.writeText(result.url || `${window.location.origin}/?client_portal=${encodeURIComponent(result.token)}`);
                     setPortalStatus(t('portalLinkCopied'));
                   } catch (error) {
                     setPortalStatus(error.message);

@@ -135,7 +135,9 @@ app.post('/api/clients/:id/share-link', asyncRoute(async (req, res) => {
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
   const rows = await sql`UPDATE clients SET portal_token_hash=${tokenHash} WHERE id=${Number(req.params.id)} AND user_id=${req.user.id} RETURNING id`;
   if (!rows[0]) return res.status(404).json({ error: 'Cliente não encontrado.' });
-  res.json({ token });
+  const productionHost = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  const baseUrl = productionHost ? `https://${productionHost}` : `${req.protocol}://${req.get('host')}`;
+  res.json({ token, url: `${baseUrl}/?client_portal=${encodeURIComponent(token)}` });
 }));
 app.delete('/api/clients/:id/share-link', asyncRoute(async (req, res) => {
   const rows = await sql`UPDATE clients SET portal_token_hash=NULL WHERE id=${Number(req.params.id)} AND user_id=${req.user.id} RETURNING id`;
