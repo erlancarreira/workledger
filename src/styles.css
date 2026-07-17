@@ -1017,7 +1017,25 @@ h3 {
 
 .client-row div {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
+}
+
+.portal-link-button {
+  min-height: 34px;
+  padding: 7px 10px;
+  color: var(--primary-strong);
+  background: var(--primary-soft);
+  border: 1px solid #b9ddd7;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.portal-link-button:hover:not(:disabled) {
+  color: #fff;
+  background: var(--primary);
+  border-color: var(--primary);
 }
 
 .icon-button {

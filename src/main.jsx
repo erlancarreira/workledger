@@ -1048,7 +1048,7 @@ function ClientManager({ clients, run, busy }) {
             <div>
               <button
                 type="button"
-                className="icon-button"
+                className="portal-link-button"
                 title={t('copyPortalLink')}
                 disabled={busy}
                 onClick={async () => {
@@ -1062,7 +1062,7 @@ function ClientManager({ clients, run, busy }) {
                   }
                 }}
               >
-                <Link2 size={15} />
+                <Link2 size={15} /> {t('clientPortal')}
               </button>
               <button
                 type="button"
