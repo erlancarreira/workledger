@@ -61,6 +61,9 @@ const messages = {
     initialDiscount: 'Ajuste inicial',
     adjustmentType: 'Tipo de ajuste',
     addAdjustment: 'Adicionar débito ou crédito',
+    editAdjustment: 'Editar ajuste',
+    adjustmentAmount: 'Valor do ajuste',
+    saveAdjustment: 'Salvar ajuste',
     removeAdjustment: 'Remover ajuste',
     adjustmentHelp: 'Use somente quando houver um valor adicional ou um crédito para o cliente.',
     discountOption: 'Crédito — reduz o total',
@@ -203,6 +206,9 @@ const messages = {
     initialDiscount: 'Initial adjustment',
     adjustmentType: 'Adjustment type',
     addAdjustment: 'Add debit or credit',
+    editAdjustment: 'Edit adjustment',
+    adjustmentAmount: 'Adjustment amount',
+    saveAdjustment: 'Save adjustment',
     removeAdjustment: 'Remove adjustment',
     adjustmentHelp: 'Use only for an additional charge or a credit for the client.',
     discountOption: 'Credit — reduces total',
@@ -932,7 +938,6 @@ function DefaultClientEditor({ dashboard, run, busy }) {
 
 function NewServiceForm({ dashboard, run, busy, onCreated }) {
   const { t, language } = useI18n();
-  const [adjustmentOpen, setAdjustmentOpen] = useState(false);
   const defaultClientId = dashboard.settings.default_client_id
     ? String(dashboard.settings.default_client_id)
     : dashboard.clients.length === 1 ? String(dashboard.clients[0].id) : '';
@@ -988,7 +993,6 @@ function NewServiceForm({ dashboard, run, busy, onCreated }) {
             discount: '0.00',
             notes: ''
           });
-          setAdjustmentOpen(false);
           return data.dashboard;
         });
       }}
@@ -1049,34 +1053,6 @@ function NewServiceForm({ dashboard, run, busy, onCreated }) {
         <span>{billingRateLabel(form.billingType, t)}</span>
         <input {...moneyInputProps(form.rate, (value) => setForm({ ...form, rate: value }), form.currency, language)} />
       </label>
-      {adjustmentOpen ? (
-        <div className="adjustment-panel">
-          <div className="adjustment-panel-heading">
-            <span><strong>{t('adjustmentType')}</strong><small>{t('adjustmentHelp')}</small></span>
-            <button type="button" onClick={() => {
-              setAdjustmentOpen(false);
-              setForm({ ...form, discount: '0.00', adjustmentType: 'discount' });
-            }}><X size={15} /> {t('removeAdjustment')}</button>
-          </div>
-          <div className="inline-fields">
-            <label className="field">
-              <span>{t('initialDiscount')}</span>
-              <input {...moneyInputProps(form.discount, (value) => setForm({ ...form, discount: value }), form.currency, language)} />
-            </label>
-            <label className="field">
-              <span>{t('adjustmentType')}</span>
-              <select value={form.adjustmentType} onChange={(event) => setForm({ ...form, adjustmentType: event.target.value })}>
-                <option value="discount">{t('discountOption')}</option>
-                <option value="surcharge">{t('surchargeOption')}</option>
-              </select>
-            </label>
-          </div>
-        </div>
-      ) : (
-        <button type="button" className="adjustment-toggle" onClick={() => setAdjustmentOpen(true)}>
-          <Plus size={16} /> {t('addAdjustment')}
-        </button>
-      )}
       <label className="field">
         <span>{t('notes')}</span>
         <textarea
@@ -1241,6 +1217,7 @@ function ServiceList({ services, selected, onSelect }) {
 function ServiceDetail({ service, clients, run, busy }) {
   const { t, language } = useI18n();
   const [editing, setEditing] = useState(false);
+  const [adjusting, setAdjusting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
 
@@ -1260,6 +1237,9 @@ function ServiceDetail({ service, clients, run, busy }) {
           <div className="detail-actions">
             <button type="button" className="receipt-action" disabled={busy} onClick={() => setReceiptOpen(true)}>
               <ReceiptText size={16} /> {t('receipt')}
+            </button>
+            <button type="button" className="secondary-button" disabled={busy} onClick={() => setAdjusting(true)}>
+              <Coins size={16} /> {service.adjustmentCents > 0 ? t('editAdjustment') : t('addAdjustment')}
             </button>
             <button type="button" className="secondary-button" disabled={busy} onClick={() => setEditing(true)}>
               <Pencil size={16} /> {t('editService')}
@@ -1310,6 +1290,12 @@ function ServiceDetail({ service, clients, run, busy }) {
             busy={busy}
             onSaved={() => setEditing(false)}
           />
+        </Modal>
+      ) : null}
+
+      {adjusting ? (
+        <Modal title={service.adjustmentCents > 0 ? t('editAdjustment') : t('addAdjustment')} onClose={() => setAdjusting(false)}>
+          <AdjustmentForm service={service} run={run} busy={busy} onSaved={() => setAdjusting(false)} />
         </Modal>
       ) : null}
 
@@ -1428,9 +1414,64 @@ function Modal({ title, children, onClose }) {
   );
 }
 
+function AdjustmentForm({ service, run, busy, onSaved }) {
+  const { t, language } = useI18n();
+  const [adjustmentType, setAdjustmentType] = useState(service.adjustmentType || service.adjustment_type || 'discount');
+  const [amount, setAmount] = useState(formatMoneyInputValue(centsToInput(service.adjustmentCents || 0), service.currency, language));
+
+  return (
+    <form
+      className="adjustment-form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        run(async () => {
+          const data = await api(`/api/services/${service.id}/adjustment`, {
+            method: 'PATCH',
+            body: JSON.stringify({ adjustmentType, amount })
+          });
+          onSaved?.();
+          return data;
+        });
+      }}
+    >
+      <p>{t('adjustmentHelp')}</p>
+      <label className="field">
+        <span>{t('adjustmentType')}</span>
+        <select value={adjustmentType} onChange={(event) => setAdjustmentType(event.target.value)}>
+          <option value="discount">{t('discountOption')}</option>
+          <option value="surcharge">{t('surchargeOption')}</option>
+        </select>
+      </label>
+      <label className="field">
+        <span>{t('adjustmentAmount')}</span>
+        <input {...moneyInputProps(amount, setAmount, service.currency, language)} />
+      </label>
+      <div className="modal-actions">
+        {service.adjustmentCents > 0 ? (
+          <button
+            type="button"
+            className="danger-action"
+            disabled={busy}
+            onClick={() => run(async () => {
+              const data = await api(`/api/services/${service.id}/adjustment`, {
+                method: 'PATCH',
+                body: JSON.stringify({ adjustmentType: 'discount', amount: 0 })
+              });
+              onSaved?.();
+              return data;
+            })}
+          >
+            <Trash2 size={16} /> {t('removeAdjustment')}
+          </button>
+        ) : null}
+        <button type="submit" disabled={busy}><Save size={16} /> {t('saveAdjustment')}</button>
+      </div>
+    </form>
+  );
+}
+
 function ServiceEditForm({ service, clients, run, busy, onSaved }) {
   const { t, language } = useI18n();
-  const [adjustmentOpen, setAdjustmentOpen] = useState(service.discount_cents > 0);
   const [form, setForm] = useState({
     title: service.title,
     clientId: service.client_id || '',
@@ -1457,7 +1498,6 @@ function ServiceEditForm({ service, clients, run, busy, onSaved }) {
       rate: formatMoneyInputValue(centsToInput(service.rate_cents), service.currency, language),
       discount: formatMoneyInputValue(centsToInput(service.discount_cents), service.currency, language)
     });
-    setAdjustmentOpen(service.discount_cents > 0);
   }, [service.id, service.title, service.client_id, service.service_date, service.service_time, service.currency, service.billingType, service.billing_type, service.adjustmentType, service.adjustment_type, service.notes, service.rate_cents, service.discount_cents, language]);
 
   return (
@@ -1516,34 +1556,6 @@ function ServiceEditForm({ service, clients, run, busy, onSaved }) {
         <span>{billingRateLabel(form.billingType, t)}</span>
         <input {...moneyInputProps(form.rate, (value) => setForm({ ...form, rate: value }), form.currency, language)} />
       </label>
-      {adjustmentOpen ? (
-        <div className="adjustment-panel wide-field">
-          <div className="adjustment-panel-heading">
-            <span><strong>{t('adjustmentType')}</strong><small>{t('adjustmentHelp')}</small></span>
-            <button type="button" onClick={() => {
-              setAdjustmentOpen(false);
-              setForm({ ...form, discount: '0.00', adjustmentType: 'discount' });
-            }}><X size={15} /> {t('removeAdjustment')}</button>
-          </div>
-          <div className="inline-fields">
-            <label className="field">
-              <span>{t('initialDiscount')}</span>
-              <input {...moneyInputProps(form.discount, (value) => setForm({ ...form, discount: value }), form.currency, language)} />
-            </label>
-            <label className="field">
-              <span>{t('adjustmentType')}</span>
-              <select value={form.adjustmentType} onChange={(event) => setForm({ ...form, adjustmentType: event.target.value })}>
-                <option value="discount">{t('discountOption')}</option>
-                <option value="surcharge">{t('surchargeOption')}</option>
-              </select>
-            </label>
-          </div>
-        </div>
-      ) : (
-        <button type="button" className="adjustment-toggle wide-field" onClick={() => setAdjustmentOpen(true)}>
-          <Plus size={16} /> {t('addAdjustment')}
-        </button>
-      )}
       <label className="field wide-field">
         <span>{t('notes')}</span>
         <textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />

@@ -173,6 +173,14 @@ app.patch('/api/services/:id', requireService, asyncRoute(async (req, res) => {
   await updateComputedStatus(s.id, req.user.id);
   res.json(await dashboardPayload(req.user.id));
 }));
+app.patch('/api/services/:id/adjustment', requireService, asyncRoute(async (req, res) => {
+  const amount = centsFromReais(req.body.amount || 0);
+  const type = adjustment(req.body.adjustmentType);
+  if (amount === null || amount < 0 || !type) return res.status(400).json({ error: 'Informe um ajuste válido.' });
+  await sql`UPDATE services SET discount_cents=${amount},adjustment_type=${type} WHERE id=${req.service.id} AND user_id=${req.user.id}`;
+  await updateComputedStatus(req.service.id, req.user.id);
+  res.json(await dashboardPayload(req.user.id));
+}));
 app.delete('/api/services/:id', requireService, asyncRoute(async (req, res) => {
   await sql`DELETE FROM services WHERE id=${req.service.id} AND user_id=${req.user.id}`;
   res.json(await dashboardPayload(req.user.id));
