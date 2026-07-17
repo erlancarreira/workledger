@@ -686,7 +686,21 @@ function App() {
 
   useEffect(() => {
     const installationId = new URLSearchParams(window.location.search).get('github_installation_id');
-    if (!user || !installationId) return;
+    const connected = new URLSearchParams(window.location.search).get('github_connected');
+    const githubError = new URLSearchParams(window.location.search).get('github_error');
+    if (!user) return;
+    if (githubError) {
+      window.history.replaceState({}, '', window.location.pathname);
+      setError('Não foi possível conectar sua conta do GitHub. Tente novamente.');
+      return;
+    }
+    if (connected !== null) {
+      window.history.replaceState({}, '', window.location.pathname);
+      setError(`GitHub conectado: ${connected} repositório(s) disponível(is).`);
+      refresh().catch((err) => setError(err.message));
+      return;
+    }
+    if (!installationId) return;
     api('/api/github/installations/attach', { method: 'POST', body: JSON.stringify({ installationId: Number(installationId) }) })
       .then((result) => {
         window.history.replaceState({}, '', window.location.pathname);
@@ -1422,6 +1436,16 @@ function GithubServicePanel({ service, run, busy }) {
     }
   }
 
+  async function connectGithub() {
+    setMessage('');
+    try {
+      const data = await api('/api/github/connect');
+      window.location.assign(data.url);
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }
+
   const linked = new Set((service.githubCommits || []).map((commit) => commit.id));
   return (
     <section className="panel github-panel">
@@ -1433,9 +1457,10 @@ function GithubServicePanel({ service, run, busy }) {
         <p className="github-empty">A integração GitHub ainda não está configurada no ambiente de produção.</p>
       ) : null}
       {status?.configured && !status.installations?.length ? (
-        <div className="github-empty">
-          <p>Instale o WorkLedger no repositório ou organização que deseja acompanhar.</p>
-          <a className="receipt-action" href={status.installationUrl}> <Github size={16} /> Instalar GitHub App</a>
+        <div className="github-onboarding">
+          <div className="github-onboarding-copy"><span>1</span><p><b>Conecte sua conta GitHub</b> para localizar instalações já existentes e associá-las ao WorkLedger.</p></div>
+          <button type="button" className="receipt-action" disabled={!status.oauthConfigured || loading} onClick={connectGithub}><Github size={16} /> Conectar GitHub</button>
+          <div className="github-onboarding-copy muted"><span>2</span><p>Se ainda não instalou o App, <a href={status.installationUrl}>instale ou gerencie a instalação</a> e depois volte aqui para conectar.</p></div>
         </div>
       ) : null}
       {status?.repositories?.length ? (

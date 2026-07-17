@@ -1592,6 +1592,8 @@ h3 {
 .github-panel {
   display: grid;
   gap: 14px;
+  grid-column: 1 / -1;
+  border-top: 3px solid #24292f;
 }
 
 .github-heading {
@@ -1630,6 +1632,42 @@ h3 {
 
 .github-empty p { margin: 0; }
 
+.github-onboarding {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: linear-gradient(135deg, #f9fbfb, #f2f7f6);
+}
+
+.github-onboarding-copy {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--muted-strong);
+  line-height: 1.45;
+}
+
+.github-onboarding-copy span {
+  display: grid;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: #24292f;
+  font-size: .75rem;
+  font-weight: 800;
+}
+
+.github-onboarding-copy p { margin: 0; }
+.github-onboarding-copy b { color: var(--text); }
+.github-onboarding-copy.muted { opacity: .86; }
+
 .github-linked-list,
 .github-commit-list {
   display: grid;
@@ -1665,6 +1703,8 @@ h3 {
   .github-controls { align-items: stretch; flex-direction: column; }
   .github-controls button { width: 100%; }
   .github-commit { align-items: flex-start; }
+  .github-onboarding { grid-template-columns: 1fr; gap: 14px; }
+  .github-onboarding .receipt-action { width: 100%; }
 }
 
 .table-row {

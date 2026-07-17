@@ -6,6 +6,10 @@ export function githubConfigured() {
   return Boolean(process.env.GITHUB_APP_ID && process.env.GITHUB_PRIVATE_KEY_BASE64 && process.env.GITHUB_APP_SLUG);
 }
 
+export function githubOAuthConfigured() {
+  return Boolean(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET);
+}
+
 function privateKey() {
   if (!process.env.GITHUB_PRIVATE_KEY_BASE64) throw new Error('GITHUB_PRIVATE_KEY_BASE64 não configurada.');
   return Buffer.from(process.env.GITHUB_PRIVATE_KEY_BASE64, 'base64').toString('utf8');
@@ -74,4 +78,23 @@ export function verifyWebhook(rawBody, signature) {
 export function installationUrl() {
   if (!process.env.GITHUB_APP_SLUG) throw new Error('GITHUB_APP_SLUG não configurada.');
   return `https://github.com/apps/${encodeURIComponent(process.env.GITHUB_APP_SLUG)}/installations/new`;
+}
+
+export function oauthAuthorizationUrl(state, callbackUrl) {
+  if (!githubOAuthConfigured()) throw new Error('GITHUB_CLIENT_ID e GITHUB_CLIENT_SECRET não configurados.');
+  const query = new URLSearchParams({ client_id: process.env.GITHUB_CLIENT_ID, redirect_uri: callbackUrl, state });
+  return `https://github.com/login/oauth/authorize?${query}`;
+}
+
+export async function getUserInstallations(code, callbackUrl) {
+  if (!githubOAuthConfigured()) throw new Error('Credenciais OAuth do GitHub não configuradas.');
+  const exchange = await fetch('https://github.com/login/oauth/access_token', {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ client_id: process.env.GITHUB_CLIENT_ID, client_secret: process.env.GITHUB_CLIENT_SECRET, code, redirect_uri: callbackUrl })
+  });
+  const tokenPayload = await exchange.json().catch(() => ({}));
+  if (!exchange.ok || !tokenPayload.access_token) throw new Error(tokenPayload.error_description || 'Não foi possível autorizar sua conta no GitHub.');
+  const installations = await githubRequest('/user/installations?per_page=100', { token: tokenPayload.access_token });
+  return installations.installations || [];
 }

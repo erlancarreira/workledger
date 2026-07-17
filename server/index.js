@@ -6,7 +6,7 @@ import {
   centsFromReais, databaseConfigured, ensureSchema, ensureUserSettings, getClientPortal, getClients, getService,
   getServices, getSettings, minutesBetween, sql, updateComputedStatus
 } from './db.js';
-import { getInstallation, getInstallationRepositories, getRepositoryCommits, githubConfigured, installationUrl, verifyWebhook } from './github.js';
+import { getInstallation, getInstallationRepositories, getRepositoryCommits, getUserInstallations, githubConfigured, githubOAuthConfigured, installationUrl, oauthAuthorizationUrl, verifyWebhook } from './github.js';
 
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -14,6 +14,9 @@ const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req,
 
 function callbackBaseUrl(req) {
   return process.env.GITHUB_CALLBACK_URL?.replace(/\/api\/github\/callback$/, '') || `${req.protocol}://${req.get('host')}`;
+}
+function oauthCallbackUrl(req) {
+  return process.env.GITHUB_CALLBACK_URL || `${req.protocol}://${req.get('host')}/api/github/callback`;
 }
 
 async function storeRepositoryCommits(repositoryId, commits) {
@@ -79,7 +82,26 @@ app.get('/api/public/client/:token', asyncRoute(async (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json(portal);
 }));
-app.get('/api/github/callback', (_req, res) => res.redirect(302, callbackBaseUrl(_req)));
+app.get('/api/github/callback', asyncRoute(async (req, res) => {
+  const state = String(req.query.state || ''), code = String(req.query.code || '');
+  const home = callbackBaseUrl(req);
+  if (!state || !code) return res.redirect(302, `${home}/?github_error=authorization`);
+  await ensureSchema();
+  const stateHash = crypto.createHash('sha256').update(state).digest('hex');
+  const rows = await sql`DELETE FROM github_oauth_states WHERE state_hash=${stateHash} AND expires_at > NOW() RETURNING user_id`;
+  if (!rows[0]) return res.redirect(302, `${home}/?github_error=authorization`);
+  try {
+    const installations = await getUserInstallations(code, oauthCallbackUrl(req));
+    let repositoryCount = 0;
+    for (const installation of installations) {
+      if (!installation.suspended_at) repositoryCount += await syncInstallationRepositories(rows[0].user_id, installation.id);
+    }
+    res.redirect(302, `${home}/?github_connected=${repositoryCount}`);
+  } catch (error) {
+    console.error('Falha ao conectar GitHub:', error.message);
+    res.redirect(302, `${home}/?github_error=connection`);
+  }
+}));
 app.get('/api/github/setup', (req, res) => {
   const installationId = Number(req.query.installation_id);
   if (!Number.isInteger(installationId) || installationId <= 0) return res.redirect(302, callbackBaseUrl(req));
@@ -169,7 +191,15 @@ app.get('/api/dashboard', asyncRoute(async (req, res) => res.json(await dashboar
 app.get('/api/github/status', asyncRoute(async (req, res) => {
   const installations = await sql`SELECT installation_id,account_login,account_type,installed_at,updated_at FROM github_installations WHERE user_id=${req.user.id} ORDER BY updated_at DESC`;
   const repositories = await sql`SELECT id,installation_id,full_name,name,default_branch,is_private,active,updated_at FROM github_repositories WHERE user_id=${req.user.id} AND active=true ORDER BY LOWER(full_name)`;
-  res.json({ configured: githubConfigured(), installationUrl: githubConfigured() ? installationUrl() : null, installations, repositories });
+  res.json({ configured: githubConfigured(), oauthConfigured: githubOAuthConfigured(), installationUrl: githubConfigured() ? installationUrl() : null, installations, repositories });
+}));
+app.get('/api/github/connect', asyncRoute(async (req, res) => {
+  if (!githubConfigured() || !githubOAuthConfigured()) return res.status(503).json({ error: 'A integração GitHub precisa de GITHUB_APP_ID, GITHUB_APP_SLUG, chave privada, GITHUB_CLIENT_ID e GITHUB_CLIENT_SECRET.' });
+  const state = crypto.randomBytes(32).toString('base64url');
+  const stateHash = crypto.createHash('sha256').update(state).digest('hex');
+  await sql`DELETE FROM github_oauth_states WHERE expires_at <= NOW()`;
+  await sql`INSERT INTO github_oauth_states (state_hash,user_id,expires_at) VALUES (${stateHash},${req.user.id},NOW() + INTERVAL '10 minutes')`;
+  res.json({ url: oauthAuthorizationUrl(state, oauthCallbackUrl(req)) });
 }));
 app.post('/api/github/installations/attach', asyncRoute(async (req, res) => {
   if (!githubConfigured()) return res.status(503).json({ error: 'A integração GitHub ainda não está configurada no ambiente.' });
