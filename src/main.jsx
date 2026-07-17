@@ -1427,6 +1427,13 @@ function GithubServicePanel({ service, run, busy }) {
 
   useEffect(() => { loadStatus(); }, []);
 
+  useEffect(() => {
+    if (service.githubRepositories?.length) {
+      setRepositoryId((current) => service.githubRepositories.some((repository) => String(repository.id) === current) ? current : String(service.githubRepositories[0].id));
+      setCommits([]);
+    }
+  }, [service.id, service.githubRepositories]);
+
   async function loadCommits(id = repositoryId) {
     if (!id) return;
     setLoading(true);
@@ -1453,11 +1460,12 @@ function GithubServicePanel({ service, run, busy }) {
   }
 
   const linked = new Set((service.githubCommits || []).map((commit) => commit.id));
+  const linkedRepositories = service.githubRepositories || [];
   return (
     <section className="panel github-panel">
       <div className="section-heading">
         <span className="github-heading"><Github size={18} /><strong>GitHub</strong></span>
-        <small>Commits vinculados ao serviço</small>
+        <small>Repositórios e commits do serviço</small>
       </div>
       {!status?.configured && !loading ? (
         <p className="github-empty">A integração GitHub ainda não está configurada no ambiente de produção.</p>
@@ -1469,10 +1477,27 @@ function GithubServicePanel({ service, run, busy }) {
           <div className="github-onboarding-copy muted"><span>2</span><p>Se ainda não instalou o App, <a href={status.installationUrl}>instale ou gerencie a instalação</a> e depois volte aqui para conectar.</p></div>
         </div>
       ) : null}
-      {status?.repositories?.length ? (
+      {status?.repositories?.length && !linkedRepositories.length ? (
+        <div className="github-repository-linker">
+          <div><strong>Vincule um repositório</strong><small>O serviço exibirá somente commits deste repositório.</small></div>
+          <select value={repositoryId} onChange={(event) => setRepositoryId(event.target.value)}>
+            {status.repositories.map((repository) => <option key={repository.id} value={repository.id}>{repository.full_name}</option>)}
+          </select>
+          <button type="button" className="receipt-action" disabled={busy || !repositoryId} onClick={() => run(() => api(`/api/services/${service.id}/github/repositories`, { method: 'POST', body: JSON.stringify({ repositoryId: Number(repositoryId) }) }))}><Link2 size={16} /> Vincular ao serviço</button>
+        </div>
+      ) : null}
+      {linkedRepositories.length ? (
+        <div className="github-repositories">
+          <div className="github-repository-title"><strong>Repositórios vinculados</strong><small>Os commits sincronizados ficam disponíveis para este serviço.</small></div>
+          <div className="github-repository-tags">
+            {linkedRepositories.map((repository) => <span key={repository.id} className="github-repository-tag"><Github size={14} /> {repository.full_name}<button type="button" aria-label={`Desvincular ${repository.full_name}`} disabled={busy} onClick={() => run(() => api(`/api/services/${service.id}/github/repositories/${repository.id}`, { method: 'DELETE' }))}><X size={13} /></button></span>)}
+          </div>
+        </div>
+      ) : null}
+      {linkedRepositories.length ? (
         <div className="github-controls">
           <select value={repositoryId} onChange={(event) => { setRepositoryId(event.target.value); setCommits([]); }}>
-            {status.repositories.map((repository) => <option key={repository.id} value={repository.id}>{repository.full_name}</option>)}
+            {linkedRepositories.map((repository) => <option key={repository.id} value={repository.id}>{repository.full_name}</option>)}
           </select>
           <button type="button" className="secondary-button" disabled={loading || busy} onClick={() => loadCommits()}><Github size={16} /> Sincronizar commits</button>
         </div>

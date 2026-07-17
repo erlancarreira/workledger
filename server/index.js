@@ -297,9 +297,20 @@ app.patch('/api/services/:id/adjustment', requireService, asyncRoute(async (req,
 }));
 app.post('/api/services/:id/github/commits', requireService, asyncRoute(async (req, res) => {
   const commitId = Number(req.body.commitId);
-  const [commit] = await sql`SELECT gc.id FROM github_commits gc JOIN github_repositories gr ON gr.id=gc.repository_id WHERE gc.id=${commitId} AND gr.user_id=${req.user.id} AND gr.active=true`;
-  if (!commit) return res.status(404).json({ error: 'Commit não encontrado neste usuário.' });
+  const [commit] = await sql`SELECT gc.id FROM github_commits gc JOIN github_repositories gr ON gr.id=gc.repository_id JOIN service_github_repositories sgr ON sgr.repository_id=gr.id WHERE gc.id=${commitId} AND gr.user_id=${req.user.id} AND gr.active=true AND sgr.service_id=${req.service.id}`;
+  if (!commit) return res.status(404).json({ error: 'Vincule o repositório a este serviço antes de adicionar seus commits.' });
   await sql`INSERT INTO service_github_commits (service_id,commit_id) VALUES (${req.service.id},${commit.id}) ON CONFLICT DO NOTHING`;
+  res.json(await dashboardPayload(req.user.id));
+}));
+app.post('/api/services/:id/github/repositories', requireService, asyncRoute(async (req, res) => {
+  const repositoryId = Number(req.body.repositoryId);
+  const [repository] = await sql`SELECT id FROM github_repositories WHERE id=${repositoryId} AND user_id=${req.user.id} AND active=true`;
+  if (!repository) return res.status(404).json({ error: 'Repositório não encontrado neste usuário.' });
+  await sql`INSERT INTO service_github_repositories (service_id,repository_id) VALUES (${req.service.id},${repository.id}) ON CONFLICT DO NOTHING`;
+  res.json(await dashboardPayload(req.user.id));
+}));
+app.delete('/api/services/:id/github/repositories/:repositoryId', requireService, asyncRoute(async (req, res) => {
+  await sql`DELETE FROM service_github_repositories sgr USING github_repositories gr WHERE sgr.service_id=${req.service.id} AND sgr.repository_id=${Number(req.params.repositoryId)} AND gr.id=sgr.repository_id AND gr.user_id=${req.user.id}`;
   res.json(await dashboardPayload(req.user.id));
 }));
 app.delete('/api/services/:id/github/commits/:commitId', requireService, asyncRoute(async (req, res) => {

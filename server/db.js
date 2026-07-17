@@ -121,6 +121,12 @@ export function ensureSchema() {
       linked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (service_id, commit_id)
     )`;
+    await sql`CREATE TABLE IF NOT EXISTS service_github_repositories (
+      service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+      repository_id BIGINT NOT NULL REFERENCES github_repositories(id) ON DELETE CASCADE,
+      linked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (service_id, repository_id)
+    )`;
     await sql`CREATE TABLE IF NOT EXISTS github_webhook_events (
       delivery_id TEXT PRIMARY KEY,
       event_name TEXT NOT NULL,
@@ -164,13 +170,14 @@ export async function getClients(userId) {
 }
 
 async function decorateService(service, userId) {
-  const [clientRecord, entries, payments, githubCommits] = await Promise.all([
+  const [clientRecord, entries, payments, githubCommits, githubRepositories] = await Promise.all([
     service.client_id
       ? sql`SELECT * FROM clients WHERE id = ${service.client_id} AND user_id = ${userId}`.then((rows) => rows[0] || null)
       : null,
     sql`SELECT * FROM time_entries WHERE service_id = ${service.id} ORDER BY work_date DESC, start_time DESC, id DESC`,
     sql`SELECT * FROM payments WHERE service_id = ${service.id} ORDER BY created_at DESC, id DESC`,
-    sql`SELECT gc.*, gr.full_name AS repository_full_name FROM service_github_commits sgc JOIN github_commits gc ON gc.id=sgc.commit_id JOIN github_repositories gr ON gr.id=gc.repository_id WHERE sgc.service_id=${service.id} ORDER BY gc.committed_at DESC NULLS LAST, gc.id DESC`
+    sql`SELECT gc.*, gr.full_name AS repository_full_name FROM service_github_commits sgc JOIN github_commits gc ON gc.id=sgc.commit_id JOIN github_repositories gr ON gr.id=gc.repository_id WHERE sgc.service_id=${service.id} ORDER BY gc.committed_at DESC NULLS LAST, gc.id DESC`,
+    sql`SELECT gr.* FROM service_github_repositories sgr JOIN github_repositories gr ON gr.id=sgr.repository_id WHERE sgr.service_id=${service.id} ORDER BY LOWER(gr.full_name)`
   ]);
   const workedMinutes = entries.reduce((sum, item) => sum + item.minutes, 0);
   const billingType = ['hourly', 'daily', 'fixed'].includes(service.billing_type) ? service.billing_type : 'hourly';
@@ -196,6 +203,7 @@ async function decorateService(service, userId) {
     entries,
     payments,
     githubCommits,
+    githubRepositories,
     workedMinutes,
     hoursCents: baseCents,
     baseCents,
