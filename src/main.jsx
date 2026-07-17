@@ -757,8 +757,10 @@ function App() {
           <span>Preferências de lançamento</span>
           <small>Usadas como padrão ao criar um novo serviço.</small>
         </div>
-        <DefaultClientEditor dashboard={dashboard} run={run} busy={busy} />
-        <RateEditor dashboard={dashboard} run={run} busy={busy} />
+        <div className="preferences-core">
+          <DefaultClientEditor dashboard={dashboard} run={run} busy={busy} />
+          <RateEditor dashboard={dashboard} run={run} busy={busy} />
+        </div>
         <GithubDefaultRepositoryEditor dashboard={dashboard} run={run} busy={busy} />
       </section>
       <section className={`mobile-quick-settings mobile-pane ${mobileView === 'overview' ? 'mobile-active' : ''}`}>
@@ -1019,27 +1021,27 @@ function GithubDefaultRepositoryEditor({ dashboard, run, busy }) {
   const [error, setError] = useState('');
   useEffect(() => setRepositoryId(String(dashboard.settings.default_github_repository_id || '')), [dashboard.settings.default_github_repository_id]);
   if (!dashboard.githubRepositories?.length) return (
-    <div className="github-default-empty">
-      <span><Github size={15} /> Repositório padrão</span>
-      <small>Busque os repositórios autorizados pela GitHub App para usá-los na criação dos serviços.</small>
-      <button type="button" className="secondary-button" disabled={busy} onClick={async () => {
+    <section className="github-preference-card is-empty">
+      <div className="github-preference-title"><span className="github-preference-icon"><Github size={18} /></span><div><strong>Integração GitHub</strong><small>Busque os repositórios autorizados pela sua GitHub App para defini-los como padrão ou usá-los em serviços específicos.</small></div></div>
+      <div className="github-preference-action"><button type="button" className="receipt-action" disabled={busy} onClick={async () => {
         try {
           setError('');
           const data = await api('/api/github/discover', { method: 'POST' });
-          if (!data.repositoryCount) throw new Error('Nenhum repositório foi encontrado na instalação da GitHub App. Verifique se ela possui acesso a pelo menos um repositório.');
+          if (!data.repositoryCount) throw new Error('Nenhum repositório foi encontrado. Verifique se a instalação da GitHub App tem acesso a pelo menos um repositório.');
           window.location.reload();
         } catch (err) { setError(err.message); }
-      }}><Github size={15} /> Buscar repositórios</button>
+      }}><Github size={16} /> Buscar repositórios</button><small>Não altera nenhum serviço existente.</small></div>
       {error ? <em>{error}</em> : null}
-    </div>
+    </section>
   );
   return (
-    <form className="top-setting-editor github-default-editor" onSubmit={(event) => {
+    <form className="github-preference-card is-ready" onSubmit={(event) => {
       event.preventDefault();
       run(() => api('/api/settings', { method: 'PATCH', body: JSON.stringify({ defaultGithubRepositoryId: repositoryId }) }));
     }}>
-      <label>
-        Repositório padrão
+      <div className="github-preference-title"><span className="github-preference-icon"><Github size={18} /></span><div><strong>Integração GitHub</strong><small>Este repositório será sugerido em novos serviços e poderá ser alterado em cada item.</small></div></div>
+      <label className="github-repository-default-field">
+        <span>Repositório padrão</span>
         <select value={repositoryId} onChange={(event) => setRepositoryId(event.target.value)}>
           <option value="">Sem repositório</option>
           {dashboard.githubRepositories.map((repository) => <option key={repository.id} value={repository.id}>{repository.full_name}</option>)}
