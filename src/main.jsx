@@ -31,7 +31,7 @@ const messages = {
     appName: 'WorkLedger',
     eyebrow: 'Controle financeiro por hora',
     title: 'WorkLedger',
-    subtitle: 'Registre horas, descontos, pagamentos e saldos transferidos com clareza operacional.',
+    subtitle: 'Registre horas, débitos, créditos, pagamentos e saldos transferidos com clareza operacional.',
     language: 'Idioma',
     defaultRate: 'Hora padrão',
     defaultClient: 'Cliente padrão',
@@ -51,8 +51,8 @@ const messages = {
     currency: 'Moeda',
     initialDiscount: 'Ajuste inicial',
     adjustmentType: 'Tipo de ajuste',
-    discountOption: 'Desconto',
-    surchargeOption: 'Acréscimo',
+    discountOption: 'Débito',
+    surchargeOption: 'Crédito',
     notes: 'Observações',
     serviceNotesPlaceholder: 'Detalhes importantes do serviço',
     clientNamePlaceholder: 'Nome do cliente',
@@ -94,8 +94,8 @@ const messages = {
     subtotal: 'Subtotal',
     total: 'Total',
     gross: 'Bruto',
-    discount: 'Desconto',
-    surcharge: 'Acréscimo',
+    discount: 'Débito',
+    surcharge: 'Crédito',
     balance: 'Saldo',
     serviceData: 'Dados do serviço',
     hourlyRate: 'Valor da hora',
@@ -109,8 +109,9 @@ const messages = {
     settle: 'Baixar',
     serviceHours: 'Horas do serviço',
     carryoverApplied: 'Saldo anterior aplicado',
-    discountApplied: 'Desconto aplicado',
-    surchargeApplied: 'Acréscimo aplicado',
+    discountApplied: 'Débito aplicado',
+    surchargeApplied: 'Crédito aplicado',
+    financialSummary: 'Resumo financeiro',
     noHours: 'Nenhuma hora lançada.',
     payments: 'Pagamentos',
     noPayments: 'Nenhum pagamento registrado.',
@@ -154,7 +155,7 @@ const messages = {
     appName: 'WorkLedger',
     eyebrow: 'Hourly finance control',
     title: 'WorkLedger',
-    subtitle: 'Track hours, discounts, payments, and carried balances with operational clarity.',
+    subtitle: 'Track hours, debits, credits, payments, and carried balances with operational clarity.',
     language: 'Language',
     defaultRate: 'Default rate',
     defaultClient: 'Default client',
@@ -174,8 +175,8 @@ const messages = {
     currency: 'Currency',
     initialDiscount: 'Initial adjustment',
     adjustmentType: 'Adjustment type',
-    discountOption: 'Discount',
-    surchargeOption: 'Surcharge',
+    discountOption: 'Debit',
+    surchargeOption: 'Credit',
     notes: 'Notes',
     serviceNotesPlaceholder: 'Important service details',
     clientNamePlaceholder: 'Client name',
@@ -217,8 +218,8 @@ const messages = {
     subtotal: 'Subtotal',
     total: 'Total',
     gross: 'Gross',
-    discount: 'Discount',
-    surcharge: 'Surcharge',
+    discount: 'Debit',
+    surcharge: 'Credit',
     balance: 'Balance',
     serviceData: 'Service details',
     hourlyRate: 'Hourly rate',
@@ -232,8 +233,9 @@ const messages = {
     settle: 'Settle',
     serviceHours: 'Service hours',
     carryoverApplied: 'Previous balance applied',
-    discountApplied: 'Discount applied',
-    surchargeApplied: 'Surcharge applied',
+    discountApplied: 'Debit applied',
+    surchargeApplied: 'Credit applied',
+    financialSummary: 'Financial summary',
     noHours: 'No hours logged.',
     payments: 'Payments',
     noPayments: 'No payments registered.',
@@ -1104,14 +1106,17 @@ function ServiceList({ services, selected, onSelect }) {
           onClick={() => onSelect(service.id)}
           type="button"
         >
-          <span>
-            <strong>{service.title}</strong>
+          <span className="service-row-main">
+            <span className="service-row-title"><strong>{service.title}</strong><em>#{service.id}</em></span>
             <small><CalendarDays size={13} /> {serviceScheduleLabel(service, t)}</small>
             <small>{clientLabel(service, t)} · {minutesToLabel(service.workedMinutes)} · {service.currency}</small>
           </span>
           <span className="row-right">
             <StatusBadge status={service.status} />
-            <b>{centsToMoney(service.balanceCents, service.currency, language)}</b>
+            <span className="row-balance">
+              <small>{t('balance')}</small>
+              <b>{centsToMoney(service.balanceCents, service.currency, language)}</b>
+            </span>
           </span>
         </button>
         ))}
@@ -1131,14 +1136,16 @@ function ServiceDetail({ service, clients, run, busy }) {
     <div className="detail-grid">
       <section className="panel detail-header">
         <div className="detail-title">
-          <div className="title-line">
-            <StatusBadge status={service.status} />
-            <span>#{service.id}</span>
-          </div>
+          <div className="title-line"><StatusBadge status={service.status} /><span>{t('service')} #{service.id}</span></div>
           <h2>{service.title}</h2>
-          <p><CalendarDays size={15} /> {serviceScheduleLabel(service, t)} · {clientLabel(service, t)} · {service.currency}</p>
+          <p><CalendarDays size={15} /> {serviceScheduleLabel(service, t)}</p>
+          <div className="detail-meta">
+            <span><Users size={14} /> {clientLabel(service, t)}</span>
+            <span><Coins size={14} /> {service.currency}</span>
+            <span><Clock3 size={14} /> {minutesToLabel(service.workedMinutes)}</span>
+          </div>
           <div className="detail-actions">
-            <button type="button" className="secondary-button" disabled={busy} onClick={() => setReceiptOpen(true)}>
+            <button type="button" className="receipt-action" disabled={busy} onClick={() => setReceiptOpen(true)}>
               <ReceiptText size={16} /> {t('receipt')}
             </button>
             <button type="button" className="secondary-button" disabled={busy} onClick={() => setEditing(true)}>
@@ -1149,14 +1156,18 @@ function ServiceDetail({ service, clients, run, busy }) {
             </button>
           </div>
         </div>
-        <div className="amount-stack">
-          <span>{t('total')}</span>
-          <strong>{centsToMoney(service.totalCents, service.currency, language)}</strong>
-          <small>
-            {t('gross')}: {centsToMoney(service.grossCents, service.currency, language)} ·{' '}
-            {t(service.adjustmentType === 'surcharge' ? 'surcharge' : 'discount')}: {centsToMoney(service.adjustmentCents, service.currency, language)}
-          </small>
-          <small>{t('balance')}: {centsToMoney(service.balanceCents, service.currency, language)}</small>
+        <div className="financial-summary">
+          <span className="financial-summary-label">{t('financialSummary')}</span>
+          <div className="financial-primary">
+            <span>{t('balance')}</span>
+            <strong>{centsToMoney(service.balanceCents, service.currency, language)}</strong>
+          </div>
+          <div className="financial-metrics">
+            <span><small>{t('total')}</small><b>{centsToMoney(service.totalCents, service.currency, language)}</b></span>
+            <span><small>{t('paidTotal')}</small><b>{centsToMoney(service.paidCents, service.currency, language)}</b></span>
+            <span><small>{t('gross')}</small><b>{centsToMoney(service.grossCents, service.currency, language)}</b></span>
+            <span><small>{t(service.adjustmentType === 'surcharge' ? 'surcharge' : 'discount')}</small><b>{centsToMoney(service.adjustmentCents, service.currency, language)}</b></span>
+          </div>
         </div>
       </section>
 
