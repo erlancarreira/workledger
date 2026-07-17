@@ -1019,18 +1019,50 @@ function DefaultClientEditor({ dashboard, run, busy }) {
 function GithubDefaultRepositoryEditor({ dashboard, run, busy }) {
   const [repositoryId, setRepositoryId] = useState(String(dashboard.settings.default_github_repository_id || ''));
   const [error, setError] = useState('');
+  const [integration, setIntegration] = useState(null);
+  const [availableInstallations, setAvailableInstallations] = useState([]);
+  const [installationId, setInstallationId] = useState('');
+  const [managing, setManaging] = useState(false);
   useEffect(() => setRepositoryId(String(dashboard.settings.default_github_repository_id || '')), [dashboard.settings.default_github_repository_id]);
+  useEffect(() => { api('/api/github/status').then(setIntegration).catch(() => {}); }, []);
+
+  async function loadAvailableInstallations() {
+    try {
+      setError('');
+      const data = await api('/api/github/available-installations');
+      setAvailableInstallations(data.installations || []);
+      if (data.installations?.[0]) setInstallationId(String(data.installations[0].installationId));
+    } catch (err) { setError(err.message); }
+  }
+
+  async function attachInstallation() {
+    try {
+      setError('');
+      const data = await api('/api/github/installations/attach', { method: 'POST', body: JSON.stringify({ installationId: Number(installationId) }) });
+      if (!data.repositoryCount) throw new Error('Esta instalação não possui repositórios disponíveis.');
+      window.location.reload();
+    } catch (err) { setError(err.message); }
+  }
+
+  async function disconnectInstallation(id) {
+    if (!window.confirm('Desvincular esta conta do WorkLedger? Os repositórios e commits importados por ela serão removidos do sistema.')) return;
+    try {
+      setError('');
+      await api(`/api/github/installations/${id}`, { method: 'DELETE' });
+      window.location.reload();
+    } catch (err) { setError(err.message); }
+  }
+
+  const connectionManager = (
+    <div className="github-connection-manager">
+      {availableInstallations.length ? <div className="github-installation-picker"><select value={installationId} onChange={(event) => setInstallationId(event.target.value)}>{availableInstallations.map((item) => <option key={item.installationId} value={item.installationId}>{item.accountLogin} · {item.repositorySelection === 'all' ? 'todos os repositórios' : 'repositórios selecionados'}</option>)}</select><button type="button" className="receipt-action" disabled={!installationId || busy} onClick={attachInstallation}>Vincular conta</button></div> : <button type="button" className="secondary-button" disabled={busy} onClick={loadAvailableInstallations}><Github size={15} /> Escolher conta GitHub</button>}
+      {integration?.installations?.length ? <div className="github-connected-accounts">{integration.installations.map((item) => <span key={item.installation_id}>{item.account_login}<button type="button" disabled={busy} onClick={() => disconnectInstallation(item.installation_id)} title="Desvincular conta"><X size={13} /></button></span>)}</div> : null}
+    </div>
+  );
   if (!dashboard.githubRepositories?.length) return (
     <section className="github-preference-card is-empty">
       <div className="github-preference-title"><span className="github-preference-icon"><Github size={18} /></span><div><strong>Integração GitHub</strong><small>Busque os repositórios autorizados pela sua GitHub App para defini-los como padrão ou usá-los em serviços específicos.</small></div></div>
-      <div className="github-preference-action"><button type="button" className="receipt-action" disabled={busy} onClick={async () => {
-        try {
-          setError('');
-          const data = await api('/api/github/discover', { method: 'POST' });
-          if (!data.repositoryCount) throw new Error('Nenhum repositório foi encontrado. Verifique se a instalação da GitHub App tem acesso a pelo menos um repositório.');
-          window.location.reload();
-        } catch (err) { setError(err.message); }
-      }}><Github size={16} /> Buscar repositórios</button><small>Não altera nenhum serviço existente.</small></div>
+      <div className="github-preference-action">{connectionManager}<small>Escolha a conta antes de importar seus repositórios.</small></div>
       {error ? <em>{error}</em> : null}
     </section>
   );
@@ -1048,6 +1080,9 @@ function GithubDefaultRepositoryEditor({ dashboard, run, busy }) {
         </select>
       </label>
       <button type="submit" disabled={busy} title="Salvar repositório padrão"><Save size={17} /></button>
+      <button type="button" className="secondary-button github-manage-button" disabled={busy} onClick={() => { setManaging((value) => !value); if (!managing) loadAvailableInstallations(); }}>{managing ? 'Fechar' : 'Trocar conta'}</button>
+      {managing ? <div className="github-preference-manager">{connectionManager}</div> : null}
+      {error ? <em>{error}</em> : null}
     </form>
   );
 }

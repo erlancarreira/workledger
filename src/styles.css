@@ -484,6 +484,49 @@ h3 {
 .github-preference-card > button { min-height: 38px; }
 .github-preference-card > em { grid-column: 1 / -1; color: var(--danger); font-size: .75rem; font-style: normal; }
 
+.github-manage-button { min-height: 38px; }
+
+.github-preference-manager {
+  grid-column: 1 / -1;
+  padding-top: 2px;
+  border-top: 1px solid #d9e7e4;
+}
+
+.github-connection-manager { display: grid; gap: 9px; }
+
+.github-installation-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.github-connected-accounts { display: flex; flex-wrap: wrap; gap: 7px; }
+
+.github-connected-accounts > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 5px 4px 9px;
+  border: 1px solid #c9ddda;
+  border-radius: 999px;
+  color: #195d56;
+  background: #fff;
+  font-size: .75rem;
+  font-weight: 700;
+}
+
+.github-connected-accounts button {
+  width: 22px;
+  min-height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  color: var(--muted-strong);
+  background: var(--surface-muted);
+  box-shadow: none;
+}
+
+.github-connected-accounts button:hover:not(:disabled) { color: var(--danger); background: var(--danger-soft); box-shadow: none; transform: none; }
+
 /* ---------- auth: open ledger book ---------- */
 
 .auth-shell {
@@ -2286,6 +2329,9 @@ h3 {
 
   .mobile-quick-settings .github-preference-card > button,
   .mobile-quick-settings .github-preference-action .receipt-action { width: 100%; }
+
+  .github-installation-picker { grid-template-columns: 1fr; }
+  .github-installation-picker .receipt-action { width: 100%; }
 
   .mobile-service-detail {
     display: none;

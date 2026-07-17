@@ -207,6 +207,16 @@ app.post('/api/github/discover', asyncRoute(async (req, res) => {
   }
   res.json({ ok: true, installationCount: installations.length, repositoryCount });
 }));
+app.get('/api/github/available-installations', asyncRoute(async (_req, res) => {
+  if (!githubConfigured()) return res.status(503).json({ error: 'A GitHub App precisa de GITHUB_APP_ID e GITHUB_PRIVATE_KEY_BASE64 no ambiente de produção.' });
+  const installations = await getAppInstallations();
+  res.json({ installations: installations.filter((installation) => !installation.suspended_at).map((installation) => ({
+    installationId: installation.id,
+    accountLogin: installation.account?.login || 'Conta GitHub',
+    accountType: installation.account?.type || '',
+    repositorySelection: installation.repository_selection || 'all'
+  })) });
+}));
 app.get('/api/github/connect', asyncRoute(async (req, res) => {
   if (!githubConfigured() || !githubOAuthConfigured()) return res.status(503).json({ error: 'A integração GitHub precisa de GITHUB_APP_ID, GITHUB_APP_SLUG, chave privada, GITHUB_CLIENT_ID e GITHUB_CLIENT_SECRET.' });
   const state = crypto.randomBytes(32).toString('base64url');
@@ -221,6 +231,11 @@ app.post('/api/github/installations/attach', asyncRoute(async (req, res) => {
   if (!Number.isInteger(installationId) || installationId <= 0) return res.status(400).json({ error: 'Instalação GitHub inválida.' });
   const repositoryCount = await syncInstallationRepositories(req.user.id, installationId);
   res.json({ ok: true, repositoryCount });
+}));
+app.delete('/api/github/installations/:installationId', asyncRoute(async (req, res) => {
+  const rows = await sql`DELETE FROM github_installations WHERE installation_id=${Number(req.params.installationId)} AND user_id=${req.user.id} RETURNING installation_id`;
+  if (!rows[0]) return res.status(404).json({ error: 'Conexão GitHub não encontrada.' });
+  res.json({ ok: true });
 }));
 app.post('/api/github/repositories/:id/sync', asyncRoute(async (req, res) => {
   if (!githubConfigured()) return res.status(503).json({ error: 'A integração GitHub ainda não está configurada no ambiente.' });
