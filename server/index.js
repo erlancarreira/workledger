@@ -74,11 +74,21 @@ app.post('/api/auth/login', asyncRoute(async (req, res) => {
   res.json({ user: publicUser(user) });
 }));
 app.post('/api/auth/recover', asyncRoute(async (req, res) => {
-  const email = String(req.body.email || '').trim().toLowerCase(), password = String(req.body.password || '');
-  if (!email || password.length < 6) return res.status(400).json({ error: 'Informe o e-mail e a nova senha com pelo menos 6 caracteres.' });
+  const token = String(req.body.token || ''), password = String(req.body.password || '');
+  if (!token || password.length < 6) return res.status(400).json({ error: 'Link inválido ou senha com menos de 6 caracteres.' });
   const { hash, salt } = hashPassword(password);
-  const rows = await sql`UPDATE users SET password_hash=${hash}, password_salt=${salt} WHERE email=${email} RETURNING id,name,email`;
-  if (!rows[0]) return res.status(404).json({ error: 'Usuário não encontrado.' });
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const rows = await sql`
+    WITH consumed AS (
+      UPDATE password_reset_tokens
+      SET consumed_at = NOW()
+      WHERE token_hash = ${tokenHash} AND consumed_at IS NULL AND expires_at > NOW()
+      RETURNING user_id
+    )
+    UPDATE users SET password_hash=${hash}, password_salt=${salt}
+    FROM consumed WHERE users.id=consumed.user_id
+    RETURNING users.id,users.name,users.email`;
+  if (!rows[0]) return res.status(400).json({ error: 'Este link é inválido, expirou ou já foi utilizado.' });
   res.json({ user: publicUser(rows[0]) });
 }));
 

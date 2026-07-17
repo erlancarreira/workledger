@@ -563,7 +563,8 @@ function LanguageSwitcher() {
 
 function AuthScreen({ onAuth }) {
   const { t } = useI18n();
-  const [mode, setMode] = useState('login');
+  const resetToken = new URLSearchParams(window.location.search).get('reset_token');
+  const [mode, setMode] = useState(resetToken ? 'recover' : 'login');
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -580,10 +581,11 @@ function AuthScreen({ onAuth }) {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form)
+        body: JSON.stringify(mode === 'recover' ? { password: form.password, token: resetToken } : form)
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Auth error');
+      if (mode === 'recover') window.history.replaceState({}, '', window.location.pathname);
       onAuth(data.user);
     } catch (err) {
       setError(err.message);
@@ -631,10 +633,10 @@ function AuthScreen({ onAuth }) {
               </label>
             ) : null}
 
-            <label className="field">
+            {mode !== 'recover' ? <label className="field">
               <span>{t('email')}</span>
               <input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
-            </label>
+            </label> : null}
 
             <label className="field">
               <span>{mode === 'recover' ? t('newPassword') : t('password')}</span>
@@ -647,7 +649,6 @@ function AuthScreen({ onAuth }) {
           <div className="auth-links">
             {mode !== 'login' ? <button type="button" className="secondary-button" onClick={() => setMode('login')}>{t('authSwitchLogin')}</button> : null}
             {mode !== 'register' ? <button type="button" className="secondary-button" onClick={() => setMode('register')}>{t('authSwitchRegister')}</button> : null}
-            {mode !== 'recover' ? <button type="button" className="secondary-button" onClick={() => setMode('recover')}>{t('authSwitchRecover')}</button> : null}
           </div>
         </section>
       </div>
