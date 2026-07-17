@@ -16,6 +16,7 @@ import {
   Hourglass,
   Github,
   Link2,
+  LogOut,
   Plus,
   Printer,
   ReceiptText,
@@ -27,6 +28,7 @@ import {
   X
 } from 'lucide-react';
 import './styles.css';
+import './tailwind.css';
 
 const messages = {
   pt: {
@@ -501,11 +503,21 @@ async function api(path, options = {}) {
 }
 
 function StatCard({ icon: Icon, label, value, muted, tone = 'neutral' }) {
+  const toneIcon = {
+    neutral: 'lg:bg-slate-100 lg:text-slate-600',
+    success: 'lg:bg-emerald-50 lg:text-emerald-600',
+    warning: 'lg:bg-amber-50 lg:text-amber-600'
+  }[tone];
+  const toneHover = {
+    neutral: 'lg:hover:border-slate-300',
+    success: 'lg:hover:border-emerald-300',
+    warning: 'lg:hover:border-amber-300'
+  }[tone];
   return (
-    <section className={`stat-card tone-${tone}`}>
-      <div className="stat-icon"><Icon size={18} /></div>
-      <span>{label}</span>
-      <strong className={muted ? 'muted-value' : ''}>{value}</strong>
+    <section className={`stat-card tone-${tone} lg:rounded-2xl lg:border lg:border-slate-200 lg:bg-white lg:p-5 lg:shadow-[0_1px_2px_rgba(15,23,42,.04)] lg:transition-colors lg:duration-200 lg:after:hidden ${toneHover}`}>
+      <div className={`stat-icon lg:h-9 lg:w-9 lg:rounded-lg ${toneIcon}`}><Icon size={18} /></div>
+      <span className="lg:text-[13px] lg:font-medium lg:text-slate-500">{label}</span>
+      <strong className={`${muted ? 'muted-value' : ''} lg:text-[1.65rem] lg:font-semibold lg:tracking-tight lg:text-slate-900`}>{value}</strong>
     </section>
   );
 }
@@ -724,8 +736,10 @@ function App() {
 
   return (
     <I18nContext.Provider value={{ language, setLanguage, t }}>
-    <main className="app-shell">
-      <header className="topbar">
+    <div className="lg:flex">
+      <NavRail t={t} onLogout={() => persistUser(null)} />
+      <main className="app-shell lg:flex-1 lg:min-w-0 lg:px-10 lg:py-8 xl:px-14">
+      <header className="topbar lg:sticky lg:top-4 lg:z-10 lg:rounded-2xl lg:px-8 lg:py-7 lg:shadow-[0_20px_45px_-15px_rgba(15,23,42,0.4)]">
         <div className="hero-copy">
           <span className="product-mark">WL</span>
           <div>
@@ -746,7 +760,7 @@ function App() {
 
       {error ? <div className="error">{error}</div> : null}
 
-      <section className={`stats-grid mobile-pane ${mobileView === 'overview' ? 'mobile-active' : ''}`}>
+      <section className={`stats-grid mobile-pane ${mobileView === 'overview' ? 'mobile-active' : ''}`} id="section-overview">
         <StatCard tone="neutral" icon={ReceiptText} label={t('amountBilled')} value={currencySummary(dashboard.totals.byCurrency, 'totalCents', language)} />
         <StatCard tone="success" icon={Banknote} label={t('amountPaid')} value={currencySummary(dashboard.totals.byCurrency, 'paidCents', language)} />
         <StatCard tone="warning" icon={WalletCards} label={t('amountOutstanding')} value={currencySummary(dashboard.totals.byCurrency, 'openCents', language)} />
@@ -777,7 +791,7 @@ function App() {
       ) : null}
 
       <div className="workspace">
-        <aside className="sidebar">
+        <aside className="sidebar" id="section-new">
           <div className={`mobile-pane ${mobileView === 'new' ? 'mobile-active' : ''}`}>
             <NewServiceForm dashboard={dashboard} run={run} busy={busy} onCreated={(id) => {
               setSelectedId(id);
@@ -785,12 +799,12 @@ function App() {
               setMobileDetail(true);
             }} />
           </div>
-          <div className={`mobile-pane ${mobileView === 'clients' ? 'mobile-active' : ''}`}>
+          <div className={`mobile-pane ${mobileView === 'clients' ? 'mobile-active' : ''}`} id="section-clients">
             <ClientManager clients={dashboard.clients} run={run} busy={busy} />
           </div>
         </aside>
 
-        <section className={`detail-panel mobile-pane ${mobileView === 'services' ? 'mobile-active' : ''}`}>
+        <section className={`detail-panel mobile-pane ${mobileView === 'services' ? 'mobile-active' : ''}`} id="section-services">
           <div className={`mobile-service-list ${mobileDetail ? 'mobile-hidden' : ''}`}>
             <ServiceList services={dashboard.services} selected={selected} onSelect={(id) => {
               setSelectedId(id);
@@ -824,7 +838,43 @@ function App() {
         </button>
       </nav>
     </main>
+    </div>
     </I18nContext.Provider>
+  );
+}
+
+function NavRail({ t, onLogout }) {
+  const items = [
+    { href: '#section-overview', icon: WalletCards, label: t('overview') },
+    { href: '#section-services', icon: ReceiptText, label: t('services') },
+    { href: '#section-new', icon: Plus, label: t('newService') },
+    { href: '#section-clients', icon: Users, label: t('clients') }
+  ];
+  return (
+    <aside className="hidden lg:flex lg:sticky lg:top-0 lg:h-screen lg:w-[76px] lg:shrink-0 lg:flex-col lg:items-center lg:gap-2 lg:bg-[#0e211d] lg:py-5">
+      <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 font-serif text-sm font-bold text-white">WL</span>
+      <nav className="mt-6 flex flex-1 flex-col items-center gap-1">
+        {items.map(({ href, icon: Icon, label }) => (
+          <a
+            key={href}
+            href={href}
+            title={label}
+            className="group flex w-14 flex-col items-center gap-1 rounded-lg py-2.5 text-white/55 no-underline transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <Icon size={18} />
+            <span className="text-center text-[9px] font-semibold leading-tight tracking-wide">{label}</span>
+          </a>
+        ))}
+      </nav>
+      <button
+        type="button"
+        title={t('logout')}
+        onClick={onLogout}
+        className="mb-1 grid h-10 w-10 place-items-center rounded-lg border-0 bg-transparent text-white/55 shadow-none transition-colors hover:bg-white/10 hover:text-white hover:shadow-none hover:translate-y-0"
+      >
+        <LogOut size={17} />
+      </button>
+    </aside>
   );
 }
 
