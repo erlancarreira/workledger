@@ -34,6 +34,7 @@ const hashPassword = (password, salt = crypto.randomBytes(16).toString('hex')) =
 });
 const currency = (value) => ['BRL', 'USD'].includes(String(value).toUpperCase()) ? String(value).toUpperCase() : null;
 const adjustment = (value) => ['discount', 'surcharge'].includes(value || 'discount') ? (value || 'discount') : null;
+const billingType = (value) => ['hourly', 'daily', 'fixed'].includes(value || 'hourly') ? (value || 'hourly') : null;
 const formatTitle = (date) => {
   const [y, m, d] = date.split('-');
   return `Serviço ${y && m && d ? `${d}/${m}/${y}` : date}`;
@@ -155,20 +156,20 @@ app.post('/api/services', asyncRoute(async (req, res) => {
   const date = String(req.body.serviceDate || new Date().toISOString().slice(0, 10)), time = String(req.body.serviceTime || '00:00');
   const client = await userClient(req.body.clientId, req.user.id), curr = currency(req.body.currency || settings.pending_carryover_currency || 'BRL');
   const rate = req.body.rate ? centsFromReais(req.body.rate) : settings.default_rate_cents, discount = req.body.discount ? centsFromReais(req.body.discount) : 0;
-  const adj = adjustment(req.body.adjustmentType);
-  if (!date || !time || !curr || !rate || discount === null || !adj) return res.status(400).json({ error: 'Dados do serviço inválidos.' });
+  const adj = adjustment(req.body.adjustmentType), billing = billingType(req.body.billingType);
+  if (!date || !time || !curr || !rate || discount === null || !adj || !billing) return res.status(400).json({ error: 'Dados do serviço inválidos.' });
   if (settings.pending_carryover_cents > 0 && curr !== settings.pending_carryover_currency) return res.status(400).json({ error: 'O próximo serviço precisa usar a mesma moeda do saldo transferido.' });
-  const [service] = await sql`INSERT INTO services (user_id,title,client_id,client,notes,service_date,service_time,currency,rate_cents,carryover_cents,discount_cents,adjustment_type)
-    VALUES (${req.user.id},${String(req.body.title || '').trim() || formatTitle(date)},${client?.id || null},${client?.name || String(req.body.client || '').trim()},${String(req.body.notes || '').trim()},${date},${time},${curr},${rate},${settings.pending_carryover_cents},${discount},${adj}) RETURNING id`;
+  const [service] = await sql`INSERT INTO services (user_id,title,client_id,client,notes,service_date,service_time,currency,rate_cents,carryover_cents,discount_cents,adjustment_type,billing_type)
+    VALUES (${req.user.id},${String(req.body.title || '').trim() || formatTitle(date)},${client?.id || null},${client?.name || String(req.body.client || '').trim()},${String(req.body.notes || '').trim()},${date},${time},${curr},${rate},${settings.pending_carryover_cents},${discount},${adj},${billing}) RETURNING id`;
   if (settings.pending_carryover_cents > 0) await sql`UPDATE user_settings SET pending_carryover_cents=0,pending_carryover_currency='BRL' WHERE user_id=${req.user.id}`;
   res.status(201).json({ service: await getService(service.id, req.user.id), dashboard: await dashboardPayload(req.user.id) });
 }));
 app.patch('/api/services/:id', requireService, asyncRoute(async (req, res) => {
   const s = req.service, date = String(req.body.serviceDate || s.service_date), time = String(req.body.serviceTime || s.service_time);
   const client = await userClient(req.body.clientId, req.user.id), curr = currency(req.body.currency || s.currency);
-  const rate = centsFromReais(req.body.rate), discount = centsFromReais(req.body.discount || 0), adj = adjustment(req.body.adjustmentType || s.adjustment_type);
-  if (!date || !time || !curr || !rate || discount === null || !adj) return res.status(400).json({ error: 'Dados do serviço inválidos.' });
-  await sql`UPDATE services SET title=${String(req.body.title || '').trim() || formatTitle(date)},client_id=${client?.id || null},client=${client?.name || String(req.body.client || '').trim()},notes=${String(req.body.notes || '').trim()},service_date=${date},service_time=${time},currency=${curr},rate_cents=${rate},discount_cents=${discount},adjustment_type=${adj} WHERE id=${s.id} AND user_id=${req.user.id}`;
+  const rate = centsFromReais(req.body.rate), discount = centsFromReais(req.body.discount || 0), adj = adjustment(req.body.adjustmentType || s.adjustment_type), billing = billingType(req.body.billingType || s.billing_type);
+  if (!date || !time || !curr || !rate || discount === null || !adj || !billing) return res.status(400).json({ error: 'Dados do serviço inválidos.' });
+  await sql`UPDATE services SET title=${String(req.body.title || '').trim() || formatTitle(date)},client_id=${client?.id || null},client=${client?.name || String(req.body.client || '').trim()},notes=${String(req.body.notes || '').trim()},service_date=${date},service_time=${time},currency=${curr},rate_cents=${rate},discount_cents=${discount},adjustment_type=${adj},billing_type=${billing} WHERE id=${s.id} AND user_id=${req.user.id}`;
   await updateComputedStatus(s.id, req.user.id);
   res.json(await dashboardPayload(req.user.id));
 }));

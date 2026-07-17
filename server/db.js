@@ -53,6 +53,7 @@ export function ensureSchema() {
       status TEXT NOT NULL DEFAULT 'open',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`;
+    await sql`ALTER TABLE services ADD COLUMN IF NOT EXISTS billing_type TEXT NOT NULL DEFAULT 'hourly'`;
     await sql`CREATE TABLE IF NOT EXISTS time_entries (
       id BIGSERIAL PRIMARY KEY,
       service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
@@ -117,9 +118,15 @@ async function decorateService(service, userId) {
     sql`SELECT * FROM payments WHERE service_id = ${service.id} ORDER BY created_at DESC, id DESC`
   ]);
   const workedMinutes = entries.reduce((sum, item) => sum + item.minutes, 0);
+  const billingType = ['hourly', 'daily', 'fixed'].includes(service.billing_type) ? service.billing_type : 'hourly';
+  const billingUnits = billingType === 'daily'
+    ? new Set(entries.map((item) => item.work_date)).size
+    : billingType === 'fixed' ? 1 : workedMinutes / 60;
   const paidCents = payments.reduce((sum, item) => sum + item.amount_cents, 0);
-  const hoursCents = Math.round((workedMinutes / 60) * service.rate_cents);
-  const grossCents = hoursCents + service.carryover_cents;
+  const baseCents = billingType === 'fixed' || billingType === 'daily'
+    ? Math.round(billingUnits * service.rate_cents)
+    : Math.round((workedMinutes / 60) * service.rate_cents);
+  const grossCents = baseCents + service.carryover_cents;
   const adjustmentCents = service.discount_cents || 0;
   const adjustmentType = service.adjustment_type === 'surcharge' ? 'surcharge' : 'discount';
   const totalCents = Math.max(
@@ -134,7 +141,10 @@ async function decorateService(service, userId) {
     entries,
     payments,
     workedMinutes,
-    hoursCents,
+    hoursCents: baseCents,
+    baseCents,
+    billingType,
+    billingUnits,
     grossCents,
     adjustmentCents,
     adjustmentType,

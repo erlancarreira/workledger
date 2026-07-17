@@ -49,6 +49,15 @@ const messages = {
     date: 'Data',
     time: 'Hora',
     currency: 'Moeda',
+    billingModel: 'Modelo de cobrança',
+    billingHourly: 'Por hora',
+    billingDaily: 'Por diária',
+    billingFixed: 'Valor fixo',
+    dailyRate: 'Valor da diária',
+    fixedAmount: 'Valor fixo',
+    daysWorked: 'Diárias contabilizadas',
+    dailySubtotal: 'Subtotal de diárias',
+    includedInFixed: 'Incluído no valor fixo',
     initialDiscount: 'Ajuste inicial',
     adjustmentType: 'Tipo de ajuste',
     addAdjustment: 'Adicionar débito ou crédito',
@@ -182,6 +191,15 @@ const messages = {
     date: 'Date',
     time: 'Time',
     currency: 'Currency',
+    billingModel: 'Billing model',
+    billingHourly: 'Hourly',
+    billingDaily: 'Daily',
+    billingFixed: 'Fixed fee',
+    dailyRate: 'Daily rate',
+    fixedAmount: 'Fixed amount',
+    daysWorked: 'Billable days',
+    dailySubtotal: 'Daily subtotal',
+    includedInFixed: 'Included in fixed fee',
     initialDiscount: 'Initial adjustment',
     adjustmentType: 'Adjustment type',
     addAdjustment: 'Add debit or credit',
@@ -361,6 +379,18 @@ function minutesToLabel(minutes = 0) {
   return `${hours}h ${rest}min`;
 }
 
+function billingTypeLabel(type, t) {
+  return t(type === 'daily' ? 'billingDaily' : type === 'fixed' ? 'billingFixed' : 'billingHourly');
+}
+
+function billingRateLabel(type, t) {
+  return t(type === 'daily' ? 'dailyRate' : type === 'fixed' ? 'fixedAmount' : 'hourlyRate');
+}
+
+function billingBaseLabel(service, t) {
+  return t(service.billingType === 'daily' ? 'dailySubtotal' : service.billingType === 'fixed' ? 'fixedAmount' : 'hoursSubtotal');
+}
+
 function localDateInput(date = new Date()) {
   const offset = date.getTimezoneOffset();
   return new Date(date.getTime() - offset * 60 * 1000).toISOString().slice(0, 10);
@@ -410,6 +440,8 @@ function buildReceiptLines(service, t, language) {
     `${t('service')}: ${service.title}`,
     `${t('date')}: ${serviceDateLabel(service, t)}`,
     `${t('currency')}: ${service.currency}`,
+    `${t('billingModel')}: ${billingTypeLabel(service.billingType, t)}`,
+    `${billingRateLabel(service.billingType, t)}: ${moneyFor(service.rate_cents)}`,
     '',
     t('serviceHours').toUpperCase()
   ];
@@ -417,13 +449,14 @@ function buildReceiptLines(service, t, language) {
   if (service.entries.length) {
     service.entries.forEach((entry) => {
       const entryValue = Math.round((entry.minutes / 60) * service.rate_cents);
-      lines.push(`${entry.start_time} - ${entry.end_time} | ${minutesToLabel(entry.minutes)} | ${moneyFor(entryValue)}`);
+      const value = service.billingType === 'hourly' ? moneyFor(entryValue) : service.billingType === 'daily' ? t('billingDaily') : t('includedInFixed');
+      lines.push(`${entry.start_time} - ${entry.end_time} | ${minutesToLabel(entry.minutes)} | ${value}`);
     });
   } else {
     lines.push(t('noHours'));
   }
 
-  lines.push('', `${t('hoursSubtotal')}: ${moneyFor(service.hoursCents)}`);
+  lines.push('', `${billingBaseLabel(service, t)}: ${moneyFor(service.baseCents)}`);
   if (service.carryover_cents > 0) lines.push(`${t('carryoverApplied')} (+): + ${moneyFor(service.carryover_cents)}`);
   if (service.adjustmentCents > 0) {
     const sign = service.adjustmentType === 'surcharge' ? '+' : '−';
@@ -533,7 +566,7 @@ function ClientPortal({ token }) {
             <div className="portal-service-body">
               <div className="portal-breakdown">
                 <strong>{t('financialComposition')}</strong>
-                <span><small>{t('hoursSubtotal')}</small><b>{centsToMoney(service.hoursCents, service.currency, language)}</b></span>
+                <span><small>{billingBaseLabel(service, t)}</small><b>{centsToMoney(service.baseCents, service.currency, language)}</b></span>
                 {service.carryover_cents > 0 ? <span><small>{t('carryoverApplied')} (+)</small><b>+ {centsToMoney(service.carryover_cents, service.currency, language)}</b></span> : null}
                 {service.adjustmentCents > 0 ? (
                   <span className={service.adjustmentType === 'surcharge' ? 'portal-debit' : 'portal-credit'}>
@@ -550,7 +583,10 @@ function ClientPortal({ token }) {
                 {service.entries.length ? service.entries.map((entry) => (
                   <span key={entry.id}>
                     <span>{new Date(`${entry.work_date}T12:00:00`).toLocaleDateString(language === 'en' ? 'en-US' : 'pt-BR')}<small>{entry.start_time}–{entry.end_time} · {minutesToLabel(entry.minutes)}</small></span>
-                    <span className="portal-entry-value"><b>{centsToMoney(Math.round((entry.minutes / 60) * service.rate_cents), service.currency, language)}</b><small>{minutesToLabel(entry.minutes)} × {centsToMoney(service.rate_cents, service.currency, language)}/h</small></span>
+                    <span className="portal-entry-value">
+                      <b>{service.billingType === 'hourly' ? centsToMoney(Math.round((entry.minutes / 60) * service.rate_cents), service.currency, language) : billingTypeLabel(service.billingType, t)}</b>
+                      <small>{service.billingType === 'hourly' ? `${minutesToLabel(entry.minutes)} × ${centsToMoney(service.rate_cents, service.currency, language)}/h` : service.billingType === 'daily' ? centsToMoney(service.rate_cents, service.currency, language) : t('includedInFixed')}</small>
+                    </span>
                   </span>
                 )) : <small>{t('noHours')}</small>}
               </div>
@@ -906,6 +942,8 @@ function NewServiceForm({ dashboard, run, busy, onCreated }) {
     serviceDate: localDateInput(),
     serviceTime: '00:00',
     currency: dashboard.settings.pending_carryover_cents > 0 ? dashboard.settings.pending_carryover_currency : 'BRL',
+    billingType: 'hourly',
+    rate: formatMoneyInputValue(centsToInput(dashboard.settings.default_rate_cents), 'BRL', language),
     adjustmentType: 'discount',
     discount: '0.00',
     notes: ''
@@ -944,6 +982,8 @@ function NewServiceForm({ dashboard, run, busy, onCreated }) {
             serviceDate: localDateInput(),
             serviceTime: '00:00',
             currency: data.dashboard.settings.pending_carryover_cents > 0 ? data.dashboard.settings.pending_carryover_currency : 'BRL',
+            billingType: 'hourly',
+            rate: formatMoneyInputValue(centsToInput(data.dashboard.settings.default_rate_cents), 'BRL', language),
             adjustmentType: 'discount',
             discount: '0.00',
             notes: ''
@@ -996,6 +1036,18 @@ function NewServiceForm({ dashboard, run, busy, onCreated }) {
           <option value="BRL">BRL</option>
           <option value="USD">USD</option>
         </select>
+      </label>
+      <label className="field">
+        <span>{t('billingModel')}</span>
+        <select value={form.billingType} onChange={(event) => setForm({ ...form, billingType: event.target.value })}>
+          <option value="hourly">{t('billingHourly')}</option>
+          <option value="daily">{t('billingDaily')}</option>
+          <option value="fixed">{t('billingFixed')}</option>
+        </select>
+      </label>
+      <label className="field">
+        <span>{billingRateLabel(form.billingType, t)}</span>
+        <input {...moneyInputProps(form.rate, (value) => setForm({ ...form, rate: value }), form.currency, language)} />
       </label>
       {adjustmentOpen ? (
         <div className="adjustment-panel">
@@ -1169,7 +1221,7 @@ function ServiceList({ services, selected, onSelect }) {
           <span className="service-row-main">
             <span className="service-row-title"><strong>{service.title}</strong><em>#{service.id}</em></span>
             <small><CalendarDays size={13} /> {serviceScheduleLabel(service, t)}</small>
-            <small>{clientLabel(service, t)} · {minutesToLabel(service.workedMinutes)} · {service.currency}</small>
+            <small>{clientLabel(service, t)} · {minutesToLabel(service.workedMinutes)} · {billingTypeLabel(service.billingType, t)} · {service.currency}</small>
           </span>
           <span className="row-right">
             <StatusBadge status={service.status} />
@@ -1203,6 +1255,7 @@ function ServiceDetail({ service, clients, run, busy }) {
             <span><Users size={14} /> {clientLabel(service, t)}</span>
             <span><Coins size={14} /> {service.currency}</span>
             <span><Clock3 size={14} /> {minutesToLabel(service.workedMinutes)}</span>
+            <span><ReceiptText size={14} /> {billingTypeLabel(service.billingType, t)}</span>
           </div>
           <div className="detail-actions">
             <button type="button" className="receipt-action" disabled={busy} onClick={() => setReceiptOpen(true)}>
@@ -1223,7 +1276,7 @@ function ServiceDetail({ service, clients, run, busy }) {
             <strong>{centsToMoney(service.balanceCents, service.currency, language)}</strong>
           </div>
           <div className="financial-ledger">
-            <span><small>{t('hoursSubtotal')}</small><b>{centsToMoney(service.hoursCents, service.currency, language)}</b></span>
+            <span><small>{billingBaseLabel(service, t)}</small><b>{centsToMoney(service.baseCents, service.currency, language)}</b></span>
             {service.carryover_cents > 0 ? <span><small>{t('carryoverApplied')} (+)</small><b>+ {centsToMoney(service.carryover_cents, service.currency, language)}</b></span> : null}
             {service.adjustmentCents > 0 ? (
               <span className={service.adjustmentType === 'surcharge' ? 'ledger-debit' : 'ledger-credit'}>
@@ -1384,6 +1437,7 @@ function ServiceEditForm({ service, clients, run, busy, onSaved }) {
     serviceDate: service.service_date || localDateInput(),
     serviceTime: service.service_time || localTimeInput(),
     currency: service.currency || 'BRL',
+    billingType: service.billingType || service.billing_type || 'hourly',
     adjustmentType: service.adjustmentType || service.adjustment_type || 'discount',
     notes: service.notes,
     rate: formatMoneyInputValue(centsToInput(service.rate_cents), service.currency, language),
@@ -1397,13 +1451,14 @@ function ServiceEditForm({ service, clients, run, busy, onSaved }) {
       serviceDate: service.service_date || localDateInput(),
       serviceTime: service.service_time || localTimeInput(),
       currency: service.currency || 'BRL',
+      billingType: service.billingType || service.billing_type || 'hourly',
       adjustmentType: service.adjustmentType || service.adjustment_type || 'discount',
       notes: service.notes,
       rate: formatMoneyInputValue(centsToInput(service.rate_cents), service.currency, language),
       discount: formatMoneyInputValue(centsToInput(service.discount_cents), service.currency, language)
     });
     setAdjustmentOpen(service.discount_cents > 0);
-  }, [service.id, service.title, service.client_id, service.service_date, service.service_time, service.currency, service.adjustmentType, service.adjustment_type, service.notes, service.rate_cents, service.discount_cents, language]);
+  }, [service.id, service.title, service.client_id, service.service_date, service.service_time, service.currency, service.billingType, service.billing_type, service.adjustmentType, service.adjustment_type, service.notes, service.rate_cents, service.discount_cents, language]);
 
   return (
     <form
@@ -1450,7 +1505,15 @@ function ServiceEditForm({ service, clients, run, busy, onSaved }) {
         </select>
       </label>
       <label className="field">
-        <span>{t('hourlyRate')}</span>
+        <span>{t('billingModel')}</span>
+        <select value={form.billingType} onChange={(event) => setForm({ ...form, billingType: event.target.value })}>
+          <option value="hourly">{t('billingHourly')}</option>
+          <option value="daily">{t('billingDaily')}</option>
+          <option value="fixed">{t('billingFixed')}</option>
+        </select>
+      </label>
+      <label className="field">
+        <span>{billingRateLabel(form.billingType, t)}</span>
         <input {...moneyInputProps(form.rate, (value) => setForm({ ...form, rate: value }), form.currency, language)} />
       </label>
       {adjustmentOpen ? (
@@ -1585,7 +1648,10 @@ function EntriesTable({ service, run, busy }) {
             {entry.notes ? <small>{entry.notes}</small> : null}
           </span>
           <div className="table-row-actions">
-            <span><strong>{centsToMoney(Math.round((entry.minutes / 60) * service.rate_cents), service.currency, language)}</strong><small>{minutesToLabel(entry.minutes)} × {centsToMoney(service.rate_cents, service.currency, language)}/h</small></span>
+            <span>
+              <strong>{service.billingType === 'hourly' ? centsToMoney(Math.round((entry.minutes / 60) * service.rate_cents), service.currency, language) : billingTypeLabel(service.billingType, t)}</strong>
+              <small>{service.billingType === 'hourly' ? `${minutesToLabel(entry.minutes)} × ${centsToMoney(service.rate_cents, service.currency, language)}/h` : service.billingType === 'daily' ? centsToMoney(service.rate_cents, service.currency, language) : t('includedInFixed')}</small>
+            </span>
             <button
               type="button"
               disabled={busy}
