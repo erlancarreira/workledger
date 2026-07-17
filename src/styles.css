@@ -2449,6 +2449,33 @@ h3 {
   }
 }
 
+@media (min-width: 1536px) {
+  .app-shell {
+    width: min(1680px, 100%);
+  }
+
+  .workspace {
+    grid-template-columns: 340px 420px minmax(0, 1fr);
+  }
+
+  .sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-panel {
+    grid-template-columns: subgrid;
+    grid-column: 2 / span 2;
+  }
+
+  .mobile-service-list {
+    position: sticky;
+    top: 24px;
+    align-self: start;
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+  }
+}
+
 @media print {
   body * {
     visibility: hidden;
