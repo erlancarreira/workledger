@@ -1016,8 +1016,22 @@ function DefaultClientEditor({ dashboard, run, busy }) {
 
 function GithubDefaultRepositoryEditor({ dashboard, run, busy }) {
   const [repositoryId, setRepositoryId] = useState(String(dashboard.settings.default_github_repository_id || ''));
+  const [error, setError] = useState('');
   useEffect(() => setRepositoryId(String(dashboard.settings.default_github_repository_id || '')), [dashboard.settings.default_github_repository_id]);
-  if (!dashboard.githubRepositories?.length) return null;
+  if (!dashboard.githubRepositories?.length) return (
+    <div className="github-default-empty">
+      <span><Github size={15} /> Repositório padrão</span>
+      <small>Conecte sua conta para usar repositórios na criação dos serviços.</small>
+      <button type="button" className="secondary-button" disabled={busy} onClick={async () => {
+        try {
+          setError('');
+          const data = await api('/api/github/connect');
+          window.location.assign(data.url);
+        } catch (err) { setError(err.message); }
+      }}><Github size={15} /> Conectar GitHub</button>
+      {error ? <em>{error}</em> : null}
+    </div>
+  );
   return (
     <form className="top-setting-editor github-default-editor" onSubmit={(event) => {
       event.preventDefault();

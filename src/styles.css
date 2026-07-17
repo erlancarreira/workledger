@@ -416,6 +416,33 @@ h3 {
   background: #fff;
 }
 
+.github-default-empty {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 10px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px dashed #b9cdc9;
+  border-radius: 9px;
+  background: #f5faf9;
+}
+
+.github-default-empty > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted-strong);
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+
+.github-default-empty small { color: var(--muted); font-size: .76rem; line-height: 1.25; }
+.github-default-empty button { min-height: 34px; padding: 0 10px; font-size: .78rem; }
+.github-default-empty em { grid-column: 1 / -1; color: var(--danger); font-size: .75rem; font-style: normal; }
+
 /* ---------- auth: open ledger book ---------- */
 
 .auth-shell {
@@ -2028,6 +2055,9 @@ h3 {
   .workspace-preferences {
     grid-template-columns: minmax(180px, .75fr) minmax(0, 1fr) minmax(0, 1fr);
   }
+
+  .github-default-empty { grid-template-columns: 1fr auto; }
+  .github-default-empty small { grid-column: 1 / -1; grid-row: 2; }
 
   .workspace {
     grid-template-columns: 1fr;
