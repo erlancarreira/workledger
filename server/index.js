@@ -6,7 +6,7 @@ import {
   centsFromReais, databaseConfigured, ensureSchema, ensureUserSettings, getClientPortal, getClients, getService,
   getServices, getSettings, minutesBetween, sql, updateComputedStatus
 } from './db.js';
-import { getInstallation, getInstallationRepositories, getRepositoryCommits, getUserInstallations, githubConfigured, githubOAuthConfigured, installationUrl, oauthAuthorizationUrl, verifyWebhook } from './github.js';
+import { getAppInstallations, getInstallation, getInstallationRepositories, getRepositoryCommits, getUserInstallations, githubConfigured, githubOAuthConfigured, installationUrl, oauthAuthorizationUrl, verifyWebhook } from './github.js';
 
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -197,6 +197,15 @@ app.get('/api/github/status', asyncRoute(async (req, res) => {
   const installations = await sql`SELECT installation_id,account_login,account_type,installed_at,updated_at FROM github_installations WHERE user_id=${req.user.id} ORDER BY updated_at DESC`;
   const repositories = await sql`SELECT id,installation_id,full_name,name,default_branch,is_private,active,updated_at FROM github_repositories WHERE user_id=${req.user.id} AND active=true ORDER BY LOWER(full_name)`;
   res.json({ configured: githubConfigured(), oauthConfigured: githubOAuthConfigured(), installationUrl: githubConfigured() ? installationUrl() : null, installations, repositories });
+}));
+app.post('/api/github/discover', asyncRoute(async (req, res) => {
+  if (!githubConfigured()) return res.status(503).json({ error: 'A GitHub App precisa de GITHUB_APP_ID e GITHUB_PRIVATE_KEY_BASE64 no ambiente de produção.' });
+  const installations = await getAppInstallations();
+  let repositoryCount = 0;
+  for (const installation of installations) {
+    if (!installation.suspended_at) repositoryCount += await syncInstallationRepositories(req.user.id, installation.id);
+  }
+  res.json({ ok: true, installationCount: installations.length, repositoryCount });
 }));
 app.get('/api/github/connect', asyncRoute(async (req, res) => {
   if (!githubConfigured() || !githubOAuthConfigured()) return res.status(503).json({ error: 'A integração GitHub precisa de GITHUB_APP_ID, GITHUB_APP_SLUG, chave privada, GITHUB_CLIENT_ID e GITHUB_CLIENT_SECRET.' });

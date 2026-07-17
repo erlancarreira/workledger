@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 const githubApi = 'https://api.github.com';
 
 export function githubConfigured() {
-  return Boolean(process.env.GITHUB_APP_ID && process.env.GITHUB_PRIVATE_KEY_BASE64 && process.env.GITHUB_APP_SLUG);
+  return Boolean(process.env.GITHUB_APP_ID && process.env.GITHUB_PRIVATE_KEY_BASE64);
 }
 
 export function githubOAuthConfigured() {
@@ -50,6 +50,10 @@ export async function getInstallation(installationId) {
   return githubRequest(`/app/installations/${Number(installationId)}`, { token: createAppJwt() });
 }
 
+export async function getAppInstallations() {
+  return githubRequest('/app/installations?per_page=100', { token: createAppJwt() });
+}
+
 export async function getInstallationToken(installationId) {
   const result = await githubRequest(`/app/installations/${Number(installationId)}/access_tokens`, { token: createAppJwt(), method: 'POST' });
   return result.token;
@@ -76,7 +80,7 @@ export function verifyWebhook(rawBody, signature) {
 }
 
 export function installationUrl() {
-  if (!process.env.GITHUB_APP_SLUG) throw new Error('GITHUB_APP_SLUG não configurada.');
+  if (!process.env.GITHUB_APP_SLUG) return null;
   return `https://github.com/apps/${encodeURIComponent(process.env.GITHUB_APP_SLUG)}/installations/new`;
 }
 

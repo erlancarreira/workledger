@@ -1021,14 +1021,15 @@ function GithubDefaultRepositoryEditor({ dashboard, run, busy }) {
   if (!dashboard.githubRepositories?.length) return (
     <div className="github-default-empty">
       <span><Github size={15} /> Repositório padrão</span>
-      <small>Conecte sua conta para usar repositórios na criação dos serviços.</small>
+      <small>Busque os repositórios autorizados pela GitHub App para usá-los na criação dos serviços.</small>
       <button type="button" className="secondary-button" disabled={busy} onClick={async () => {
         try {
           setError('');
-          const data = await api('/api/github/connect');
-          window.location.assign(data.url);
+          const data = await api('/api/github/discover', { method: 'POST' });
+          if (!data.repositoryCount) throw new Error('Nenhum repositório foi encontrado na instalação da GitHub App. Verifique se ela possui acesso a pelo menos um repositório.');
+          window.location.reload();
         } catch (err) { setError(err.message); }
-      }}><Github size={15} /> Conectar GitHub</button>
+      }}><Github size={15} /> Buscar repositórios</button>
       {error ? <em>{error}</em> : null}
     </div>
   );
@@ -1509,6 +1510,20 @@ function GithubServicePanel({ service, run, busy }) {
     }
   }
 
+  async function discoverRepositories() {
+    setLoading(true);
+    setMessage('');
+    try {
+      const data = await api('/api/github/discover', { method: 'POST' });
+      setMessage(data.repositoryCount ? `${data.repositoryCount} repositório(s) encontrado(s). Atualize a página para utilizá-los.` : 'Nenhum repositório foi encontrado. Verifique a permissão da instalação da GitHub App.');
+      await loadStatus();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   const linked = new Set((service.githubCommits || []).map((commit) => commit.id));
   const linkedRepositories = service.githubRepositories || [];
   return (
@@ -1522,9 +1537,9 @@ function GithubServicePanel({ service, run, busy }) {
       ) : null}
       {status?.configured && !status.installations?.length ? (
         <div className="github-onboarding">
-          <div className="github-onboarding-copy"><span>1</span><p><b>Conecte sua conta GitHub</b> para localizar instalações já existentes e associá-las ao WorkLedger.</p></div>
-          <button type="button" className="receipt-action" disabled={!status.oauthConfigured || loading} onClick={connectGithub}><Github size={16} /> Conectar GitHub</button>
-          <div className="github-onboarding-copy muted"><span>2</span><p>Se ainda não instalou o App, <a href={status.installationUrl}>instale ou gerencie a instalação</a> e depois volte aqui para conectar.</p></div>
+          <div className="github-onboarding-copy"><span>1</span><p><b>Busque os repositórios autorizados</b> pela instalação existente da GitHub App.</p></div>
+          <button type="button" className="receipt-action" disabled={loading} onClick={discoverRepositories}><Github size={16} /> Buscar repositórios</button>
+          <div className="github-onboarding-copy muted"><span>2</span><p>Se nenhum repositório for encontrado, <a href={status.installationUrl || '#'}>revise a instalação do App</a> e garanta acesso a pelo menos um repositório.</p></div>
         </div>
       ) : null}
       {status?.repositories?.length && !linkedRepositories.length ? (
