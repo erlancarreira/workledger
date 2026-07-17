@@ -121,7 +121,12 @@ const formatTitle = (date) => {
 };
 
 async function dashboardPayload(userId) {
-  const [settings, clients, services] = await Promise.all([getSettings(userId), getClients(userId), getServices(userId)]);
+  const [settings, clients, services, githubRepositories] = await Promise.all([
+    getSettings(userId),
+    getClients(userId),
+    getServices(userId),
+    sql`SELECT id,full_name,name,default_branch FROM github_repositories WHERE user_id=${userId} AND active=true ORDER BY LOWER(full_name)`
+  ]);
   const totals = services.reduce((acc, service) => {
     acc.workedMinutes += service.workedMinutes;
     acc.byCurrency[service.currency] ||= { totalCents: 0, paidCents: 0, openCents: 0 };
@@ -130,7 +135,7 @@ async function dashboardPayload(userId) {
     if (service.status !== 'transferred') acc.byCurrency[service.currency].openCents += service.balanceCents;
     return acc;
   }, { workedMinutes: 0, byCurrency: { BRL: { totalCents: 0, paidCents: 0, openCents: 0 }, USD: { totalCents: 0, paidCents: 0, openCents: 0 } } });
-  return { settings, clients, services, totals };
+  return { settings, clients, services, githubRepositories, totals };
 }
 
 const requireUser = asyncRoute(async (req, res, next) => {
@@ -226,9 +231,11 @@ app.patch('/api/settings', asyncRoute(async (req, res) => {
   const current = await getSettings(req.user.id);
   const rate = req.body.defaultRate === undefined ? current.default_rate_cents : centsFromReais(req.body.defaultRate);
   const clientId = req.body.defaultClientId === undefined ? current.default_client_id : (req.body.defaultClientId ? Number(req.body.defaultClientId) : null);
+  const githubRepositoryId = req.body.defaultGithubRepositoryId === undefined ? current.default_github_repository_id : (req.body.defaultGithubRepositoryId ? Number(req.body.defaultGithubRepositoryId) : null);
   if (!Number.isInteger(rate) || rate <= 0) return res.status(400).json({ error: 'Informe um valor de hora válido.' });
   if (clientId && !(await userClient(clientId, req.user.id))) return res.status(400).json({ error: 'Cliente padrão inválido.' });
-  await sql`UPDATE user_settings SET default_rate_cents=${rate}, default_client_id=${clientId} WHERE user_id=${req.user.id}`;
+  if (githubRepositoryId && !(await sql`SELECT id FROM github_repositories WHERE id=${githubRepositoryId} AND user_id=${req.user.id} AND active=true`)[0]) return res.status(400).json({ error: 'Repositório padrão inválido.' });
+  await sql`UPDATE user_settings SET default_rate_cents=${rate}, default_client_id=${clientId}, default_github_repository_id=${githubRepositoryId} WHERE user_id=${req.user.id}`;
   res.json(await dashboardPayload(req.user.id));
 }));
 app.post('/api/clients', asyncRoute(async (req, res) => {
@@ -271,11 +278,15 @@ app.post('/api/services', asyncRoute(async (req, res) => {
   const client = await userClient(req.body.clientId, req.user.id), curr = currency(req.body.currency || settings.pending_carryover_currency || 'BRL');
   const rate = req.body.rate ? centsFromReais(req.body.rate) : settings.default_rate_cents, discount = req.body.discount ? centsFromReais(req.body.discount) : 0;
   const adj = adjustment(req.body.adjustmentType), billing = billingType(req.body.billingType);
+  const requestedRepositoryId = Object.prototype.hasOwnProperty.call(req.body, 'githubRepositoryId') ? req.body.githubRepositoryId : settings.default_github_repository_id;
+  const githubRepositoryId = requestedRepositoryId ? Number(requestedRepositoryId) : null;
   if (!date || !time || !curr || !rate || discount === null || !adj || !billing) return res.status(400).json({ error: 'Dados do serviço inválidos.' });
+  if (githubRepositoryId && !(await sql`SELECT id FROM github_repositories WHERE id=${githubRepositoryId} AND user_id=${req.user.id} AND active=true`)[0]) return res.status(400).json({ error: 'Repositório do serviço inválido.' });
   if (settings.pending_carryover_cents > 0 && curr !== settings.pending_carryover_currency) return res.status(400).json({ error: 'O próximo serviço precisa usar a mesma moeda do saldo transferido.' });
   const [service] = await sql`INSERT INTO services (user_id,title,client_id,client,notes,service_date,service_time,currency,rate_cents,carryover_cents,discount_cents,adjustment_type,billing_type)
     VALUES (${req.user.id},${String(req.body.title || '').trim() || formatTitle(date)},${client?.id || null},${client?.name || String(req.body.client || '').trim()},${String(req.body.notes || '').trim()},${date},${time},${curr},${rate},${settings.pending_carryover_cents},${discount},${adj},${billing}) RETURNING id`;
   if (settings.pending_carryover_cents > 0) await sql`UPDATE user_settings SET pending_carryover_cents=0,pending_carryover_currency='BRL' WHERE user_id=${req.user.id}`;
+  if (githubRepositoryId) await sql`INSERT INTO service_github_repositories (service_id,repository_id) VALUES (${service.id},${githubRepositoryId}) ON CONFLICT DO NOTHING`;
   res.status(201).json({ service: await getService(service.id, req.user.id), dashboard: await dashboardPayload(req.user.id) });
 }));
 app.patch('/api/services/:id', requireService, asyncRoute(async (req, res) => {
@@ -307,6 +318,14 @@ app.post('/api/services/:id/github/repositories', requireService, asyncRoute(asy
   const [repository] = await sql`SELECT id FROM github_repositories WHERE id=${repositoryId} AND user_id=${req.user.id} AND active=true`;
   if (!repository) return res.status(404).json({ error: 'Repositório não encontrado neste usuário.' });
   await sql`INSERT INTO service_github_repositories (service_id,repository_id) VALUES (${req.service.id},${repository.id}) ON CONFLICT DO NOTHING`;
+  res.json(await dashboardPayload(req.user.id));
+}));
+app.put('/api/services/:id/github/repository', requireService, asyncRoute(async (req, res) => {
+  const repositoryId = req.body.repositoryId ? Number(req.body.repositoryId) : null;
+  if (repositoryId && !(await sql`SELECT id FROM github_repositories WHERE id=${repositoryId} AND user_id=${req.user.id} AND active=true`)[0]) return res.status(404).json({ error: 'Repositório não encontrado neste usuário.' });
+  await sql`DELETE FROM service_github_commits WHERE service_id=${req.service.id}`;
+  await sql`DELETE FROM service_github_repositories WHERE service_id=${req.service.id}`;
+  if (repositoryId) await sql`INSERT INTO service_github_repositories (service_id,repository_id) VALUES (${req.service.id},${repositoryId})`;
   res.json(await dashboardPayload(req.user.id));
 }));
 app.delete('/api/services/:id/github/repositories/:repositoryId', requireService, asyncRoute(async (req, res) => {

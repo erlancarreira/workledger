@@ -759,10 +759,12 @@ function App() {
         </div>
         <DefaultClientEditor dashboard={dashboard} run={run} busy={busy} />
         <RateEditor dashboard={dashboard} run={run} busy={busy} />
+        <GithubDefaultRepositoryEditor dashboard={dashboard} run={run} busy={busy} />
       </section>
       <section className={`mobile-quick-settings mobile-pane ${mobileView === 'overview' ? 'mobile-active' : ''}`}>
         <DefaultClientEditor dashboard={dashboard} run={run} busy={busy} />
         <RateEditor dashboard={dashboard} run={run} busy={busy} />
+        <GithubDefaultRepositoryEditor dashboard={dashboard} run={run} busy={busy} />
       </section>
       {dashboard.settings.pending_carryover_cents > 0 ? (
         <div className={`carryover-notice mobile-pane ${mobileView === 'overview' ? 'mobile-active' : ''}`}>
@@ -1012,6 +1014,27 @@ function DefaultClientEditor({ dashboard, run, busy }) {
   );
 }
 
+function GithubDefaultRepositoryEditor({ dashboard, run, busy }) {
+  const [repositoryId, setRepositoryId] = useState(String(dashboard.settings.default_github_repository_id || ''));
+  useEffect(() => setRepositoryId(String(dashboard.settings.default_github_repository_id || '')), [dashboard.settings.default_github_repository_id]);
+  if (!dashboard.githubRepositories?.length) return null;
+  return (
+    <form className="top-setting-editor github-default-editor" onSubmit={(event) => {
+      event.preventDefault();
+      run(() => api('/api/settings', { method: 'PATCH', body: JSON.stringify({ defaultGithubRepositoryId: repositoryId }) }));
+    }}>
+      <label>
+        Repositório padrão
+        <select value={repositoryId} onChange={(event) => setRepositoryId(event.target.value)}>
+          <option value="">Sem repositório</option>
+          {dashboard.githubRepositories.map((repository) => <option key={repository.id} value={repository.id}>{repository.full_name}</option>)}
+        </select>
+      </label>
+      <button type="submit" disabled={busy} title="Salvar repositório padrão"><Save size={17} /></button>
+    </form>
+  );
+}
+
 function NewServiceForm({ dashboard, run, busy, onCreated }) {
   const { t, language } = useI18n();
   const defaultClientId = dashboard.settings.default_client_id
@@ -1020,6 +1043,7 @@ function NewServiceForm({ dashboard, run, busy, onCreated }) {
   const [form, setForm] = useState({
     title: '',
     clientId: defaultClientId,
+    githubRepositoryId: dashboard.settings.default_github_repository_id ? String(dashboard.settings.default_github_repository_id) : '',
     serviceDate: localDateInput(),
     serviceTime: '00:00',
     currency: dashboard.settings.pending_carryover_cents > 0 ? dashboard.settings.pending_carryover_currency : 'BRL',
@@ -1060,6 +1084,7 @@ function NewServiceForm({ dashboard, run, busy, onCreated }) {
           setForm({
             title: '',
             clientId: nextClientId,
+            githubRepositoryId: data.dashboard.settings.default_github_repository_id ? String(data.dashboard.settings.default_github_repository_id) : '',
             serviceDate: localDateInput(),
             serviceTime: '00:00',
             currency: data.dashboard.settings.pending_carryover_cents > 0 ? data.dashboard.settings.pending_carryover_currency : 'BRL',
@@ -1102,6 +1127,16 @@ function NewServiceForm({ dashboard, run, busy, onCreated }) {
           ))}
         </select>
       </label>
+      {dashboard.githubRepositories?.length ? (
+        <label className="field wide-field github-service-field">
+          <span>Repositório GitHub <small>Opcional</small></span>
+          <select value={form.githubRepositoryId} onChange={(event) => setForm({ ...form, githubRepositoryId: event.target.value })}>
+            <option value="">Nenhum repositório neste serviço</option>
+            {dashboard.githubRepositories.map((repository) => <option key={repository.id} value={repository.id}>{repository.full_name}</option>)}
+          </select>
+          <small>Você pode alterar ou remover o vínculo depois, no detalhe do serviço.</small>
+        </label>
+      ) : null}
       <label className="field">
         <span>{t('date')}</span>
         <input
@@ -1411,6 +1446,7 @@ function GithubServicePanel({ service, run, busy }) {
   const [commits, setCommits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
+  const [changingRepository, setChangingRepository] = useState(false);
 
   async function loadStatus() {
     setLoading(true);
@@ -1488,10 +1524,22 @@ function GithubServicePanel({ service, run, busy }) {
       ) : null}
       {linkedRepositories.length ? (
         <div className="github-repositories">
-          <div className="github-repository-title"><strong>Repositórios vinculados</strong><small>Os commits sincronizados ficam disponíveis para este serviço.</small></div>
+          <div className="github-repository-title"><strong>Repositório do serviço</strong><small>Os commits sincronizados ficam disponíveis para este serviço.</small></div>
           <div className="github-repository-tags">
             {linkedRepositories.map((repository) => <span key={repository.id} className="github-repository-tag"><Github size={14} /> {repository.full_name}<button type="button" aria-label={`Desvincular ${repository.full_name}`} disabled={busy} onClick={() => run(() => api(`/api/services/${service.id}/github/repositories/${repository.id}`, { method: 'DELETE' }))}><X size={13} /></button></span>)}
           </div>
+          <button type="button" className="secondary-button github-change-button" disabled={busy} onClick={() => setChangingRepository((current) => !current)}>{changingRepository ? 'Cancelar alteração' : 'Alterar repositório'}</button>
+          {changingRepository ? (
+            <div className="github-repository-change">
+              <select value={repositoryId} onChange={(event) => setRepositoryId(event.target.value)}>
+                {status?.repositories?.map((repository) => <option key={repository.id} value={repository.id}>{repository.full_name}</option>)}
+              </select>
+              <button type="button" className="receipt-action" disabled={busy || !repositoryId} onClick={() => run(async () => {
+                const data = await api(`/api/services/${service.id}/github/repository`, { method: 'PUT', body: JSON.stringify({ repositoryId: Number(repositoryId) }) });
+                setChangingRepository(false); setCommits([]); return data;
+              })}>Salvar repositório</button>
+            </div>
+          ) : null}
         </div>
       ) : null}
       {linkedRepositories.length ? (

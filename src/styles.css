@@ -361,7 +361,7 @@ h3 {
 
 .workspace-preferences {
   display: grid;
-  grid-template-columns: minmax(240px, 1fr) minmax(250px, .9fr) minmax(220px, .72fr);
+  grid-template-columns: minmax(180px, .7fr) minmax(210px, 1fr) minmax(180px, .82fr) minmax(180px, .82fr);
   align-items: center;
   gap: 14px;
   margin: -2px 0 18px;
@@ -394,6 +394,16 @@ h3 {
   border-color: var(--border);
   background: var(--surface-muted);
 }
+
+.github-service-field small {
+  color: var(--muted);
+  font-size: .75rem;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.github-service-field > span small { margin-left: 4px; }
 
 .workspace-preferences .top-setting-editor label,
 .workspace-preferences .rate-editor label {
@@ -1716,6 +1726,15 @@ h3 {
 
 .github-repository-tag button:hover:not(:disabled) { color: var(--danger); background: var(--danger-soft); box-shadow: none; transform: none; }
 
+.github-change-button { justify-self: start; min-height: 34px; font-size: .82rem; }
+
+.github-repository-change {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  padding-top: 4px;
+}
+
 .github-controls select {
   flex: 1;
   min-width: 0;
@@ -1812,6 +1831,8 @@ h3 {
   .github-controls button { width: 100%; }
   .github-repository-linker { grid-template-columns: 1fr; }
   .github-repository-linker .receipt-action { width: 100%; }
+  .github-repository-change { grid-template-columns: 1fr; }
+  .github-repository-change .receipt-action { width: 100%; }
   .github-commit { align-items: flex-start; }
   .github-onboarding { grid-template-columns: 1fr; gap: 14px; }
   .github-onboarding .receipt-action { width: 100%; }
@@ -2005,7 +2026,7 @@ h3 {
 
 @media (max-width: 1120px) {
   .workspace-preferences {
-    grid-template-columns: minmax(210px, .8fr) minmax(0, 1fr) minmax(0, .8fr);
+    grid-template-columns: minmax(180px, .75fr) minmax(0, 1fr) minmax(0, 1fr);
   }
 
   .workspace {

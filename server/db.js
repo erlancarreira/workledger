@@ -127,6 +127,7 @@ export function ensureSchema() {
       linked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (service_id, repository_id)
     )`;
+    await sql`ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS default_github_repository_id BIGINT REFERENCES github_repositories(id) ON DELETE SET NULL`;
     await sql`CREATE TABLE IF NOT EXISTS github_webhook_events (
       delivery_id TEXT PRIMARY KEY,
       event_name TEXT NOT NULL,
