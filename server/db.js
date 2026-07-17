@@ -118,11 +118,14 @@ async function decorateService(service, userId) {
   ]);
   const workedMinutes = entries.reduce((sum, item) => sum + item.minutes, 0);
   const paidCents = payments.reduce((sum, item) => sum + item.amount_cents, 0);
-  const grossCents = Math.round((workedMinutes / 60) * service.rate_cents) + service.carryover_cents;
+  const hoursCents = Math.round((workedMinutes / 60) * service.rate_cents);
+  const grossCents = hoursCents + service.carryover_cents;
+  const adjustmentCents = service.discount_cents || 0;
+  const adjustmentType = service.adjustment_type === 'surcharge' ? 'surcharge' : 'discount';
   const totalCents = Math.max(
-    service.adjustment_type === 'surcharge'
-      ? grossCents + service.discount_cents
-      : grossCents - service.discount_cents,
+    adjustmentType === 'surcharge'
+      ? grossCents + adjustmentCents
+      : grossCents - adjustmentCents,
     0
   );
   return {
@@ -131,7 +134,10 @@ async function decorateService(service, userId) {
     entries,
     payments,
     workedMinutes,
+    hoursCents,
     grossCents,
+    adjustmentCents,
+    adjustmentType,
     totalCents,
     paidCents,
     balanceCents: Math.max(totalCents - paidCents, 0)

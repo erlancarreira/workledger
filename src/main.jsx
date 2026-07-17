@@ -69,6 +69,9 @@ const messages = {
     amountPaid: 'Total pago',
     amountOutstanding: 'Saldo em aberto',
     paymentHistory: 'Histórico de pagamentos',
+    workHistory: 'Jornadas registradas',
+    financialComposition: 'Composição do valor',
+    portalUpdated: 'Posição financeira consolidada',
     name: 'Nome',
     addClient: 'Adicionar cliente',
     saveClient: 'Salvar cliente',
@@ -193,6 +196,9 @@ const messages = {
     amountPaid: 'Total paid',
     amountOutstanding: 'Outstanding',
     paymentHistory: 'Payment history',
+    workHistory: 'Logged work sessions',
+    financialComposition: 'Amount breakdown',
+    portalUpdated: 'Consolidated financial position',
     name: 'Name',
     addClient: 'Add client',
     saveClient: 'Save client',
@@ -475,7 +481,7 @@ function ClientPortal({ token }) {
     <main className="portal-shell">
       <header className="portal-header">
         <div>
-          <p className="eyebrow">WorkLedger</p>
+          <div className="portal-brand"><span>WL</span><p>WorkLedger</p></div>
           <h1>{t('portalTitle')}</h1>
           <p className="subtitle">{t('portalSubtitle')}</p>
         </div>
@@ -489,10 +495,12 @@ function ClientPortal({ token }) {
       <section className="portal-totals">
         {Object.entries(data.totals).map(([currency, totals]) => (
           <article className="portal-currency" key={currency}>
-            <strong>{currency}</strong>
-            <div><span>{t('amountBilled')}</span><b>{centsToMoney(totals.totalCents, currency, language)}</b></div>
-            <div><span>{t('amountPaid')}</span><b>{centsToMoney(totals.paidCents, currency, language)}</b></div>
-            <div className="portal-balance"><span>{t('amountOutstanding')}</span><b>{centsToMoney(totals.balanceCents, currency, language)}</b></div>
+            <div className="portal-currency-heading"><span>{t('portalUpdated')}</span><strong>{currency}</strong></div>
+            <div className="portal-kpi-grid">
+              <div><span>{t('amountBilled')}</span><b>{centsToMoney(totals.totalCents, currency, language)}</b></div>
+              <div><span>{t('amountPaid')}</span><b>{centsToMoney(totals.paidCents, currency, language)}</b></div>
+              <div className="portal-balance"><span>{t('amountOutstanding')}</span><b>{centsToMoney(totals.balanceCents, currency, language)}</b></div>
+            </div>
           </article>
         ))}
       </section>
@@ -502,13 +510,33 @@ function ClientPortal({ token }) {
         {data.services.map((service) => (
           <article className="portal-service" key={service.id}>
             <div className="portal-service-heading">
-              <div><h2>{service.title}</h2><span>{serviceDateLabel(service, t)} · {minutesToLabel(service.workedMinutes)}</span></div>
+              <div>
+                <span className="portal-service-reference">{t('service')} #{service.id}</span>
+                <h2>{service.title}</h2>
+                <span>{serviceDateLabel(service, t)} · {minutesToLabel(service.workedMinutes)} · {service.currency}</span>
+              </div>
               <StatusBadge status={service.status} />
             </div>
-            <div className="portal-service-values">
-              <span>{t('total')}<b>{centsToMoney(service.totalCents, service.currency, language)}</b></span>
-              <span>{t('paidTotal')}<b>{centsToMoney(service.paidCents, service.currency, language)}</b></span>
-              <span>{t('balance')}<b>{centsToMoney(service.balanceCents, service.currency, language)}</b></span>
+            <div className="portal-service-body">
+              <div className="portal-breakdown">
+                <strong>{t('financialComposition')}</strong>
+                <span><small>{t('hourlyRate')}</small><b>{centsToMoney(service.rate_cents, service.currency, language)}</b></span>
+                <span><small>{t('serviceHours')}</small><b>{centsToMoney(service.hoursCents, service.currency, language)}</b></span>
+                {service.carryover_cents > 0 ? <span><small>{t('carryoverApplied')}</small><b>{centsToMoney(service.carryover_cents, service.currency, language)}</b></span> : null}
+                <span><small>{t(service.adjustmentType === 'surcharge' ? 'surcharge' : 'discount')}</small><b>{centsToMoney(service.adjustmentCents, service.currency, language)}</b></span>
+                <span className="portal-breakdown-total"><small>{t('total')}</small><b>{centsToMoney(service.totalCents, service.currency, language)}</b></span>
+                <span><small>{t('paidTotal')}</small><b>{centsToMoney(service.paidCents, service.currency, language)}</b></span>
+                <span className="portal-breakdown-balance"><small>{t('balance')}</small><b>{centsToMoney(service.balanceCents, service.currency, language)}</b></span>
+              </div>
+              <div className="portal-work">
+                <strong>{t('workHistory')}</strong>
+                {service.entries.length ? service.entries.map((entry) => (
+                  <span key={entry.id}>
+                    <span>{new Date(`${entry.work_date}T12:00:00`).toLocaleDateString(language === 'en' ? 'en-US' : 'pt-BR')}<small>{entry.start_time}–{entry.end_time} · {minutesToLabel(entry.minutes)}</small></span>
+                    <b>{centsToMoney(Math.round((entry.minutes / 60) * service.rate_cents), service.currency, language)}</b>
+                  </span>
+                )) : <small>{t('noHours')}</small>}
+              </div>
             </div>
             {service.payments.length ? (
               <div className="portal-payments">
