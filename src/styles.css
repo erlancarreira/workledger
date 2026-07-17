@@ -1587,6 +1587,86 @@ h3 {
   border-bottom: 1px solid var(--border);
 }
 
+/* ---------- GitHub integration ---------- */
+
+.github-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.github-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.github-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.github-controls select {
+  flex: 1;
+  min-width: 0;
+}
+
+.github-empty,
+.github-message {
+  margin: 0;
+  color: var(--muted-strong);
+  line-height: 1.5;
+}
+
+.github-empty {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  padding: 14px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface-muted);
+}
+
+.github-empty p { margin: 0; }
+
+.github-linked-list,
+.github-commit-list {
+  display: grid;
+  gap: 8px;
+}
+
+.github-linked-list > strong,
+.github-commit-list > strong {
+  font-size: .78rem;
+  color: var(--muted-strong);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.github-commit {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #fff;
+}
+
+.github-commit > span { display: grid; gap: 3px; min-width: 0; }
+.github-commit b, .github-commit small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.github-commit a { color: var(--primary-strong); font-family: var(--font-mono); font-size: .78rem; font-weight: 700; }
+.github-commit small { color: var(--muted); }
+.github-commit > button { flex: 0 0 auto; }
+
+@media (max-width: 640px) {
+  .github-controls { align-items: stretch; flex-direction: column; }
+  .github-controls button { width: 100%; }
+  .github-commit { align-items: flex-start; }
+}
+
 .table-row {
   min-height: 62px;
   padding: 10px 12px;

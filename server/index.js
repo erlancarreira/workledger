@@ -6,10 +6,62 @@ import {
   centsFromReais, databaseConfigured, ensureSchema, ensureUserSettings, getClientPortal, getClients, getService,
   getServices, getSettings, minutesBetween, sql, updateComputedStatus
 } from './db.js';
+import { getInstallation, getInstallationRepositories, getRepositoryCommits, githubConfigured, installationUrl, verifyWebhook } from './github.js';
 
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
+
+function callbackBaseUrl(req) {
+  return process.env.GITHUB_CALLBACK_URL?.replace(/\/api\/github\/callback$/, '') || `${req.protocol}://${req.get('host')}`;
+}
+
+async function storeRepositoryCommits(repositoryId, commits) {
+  for (const commit of commits) {
+    const message = String(commit.commit?.message || '').split('\n')[0].slice(0, 500);
+    await sql`INSERT INTO github_commits (repository_id,sha,message,author_name,author_login,committed_at,html_url)
+      VALUES (${repositoryId},${commit.sha},${message},${String(commit.commit?.author?.name || '')},${String(commit.author?.login || '')},${commit.commit?.author?.date || null},${String(commit.html_url || '')})
+      ON CONFLICT (repository_id,sha) DO UPDATE SET message=EXCLUDED.message,author_name=EXCLUDED.author_name,author_login=EXCLUDED.author_login,committed_at=EXCLUDED.committed_at,html_url=EXCLUDED.html_url`;
+  }
+}
+
+async function syncInstallationRepositories(userId, installationId) {
+  const installation = await getInstallation(installationId);
+  const repositories = await getInstallationRepositories(installationId);
+  await sql`INSERT INTO github_installations (user_id,installation_id,account_login,account_type,updated_at)
+    VALUES (${userId},${installationId},${String(installation.account?.login || '')},${String(installation.account?.type || '')},NOW())
+    ON CONFLICT (installation_id) DO UPDATE SET user_id=EXCLUDED.user_id,account_login=EXCLUDED.account_login,account_type=EXCLUDED.account_type,updated_at=NOW()`;
+  for (const repository of repositories) {
+    await sql`INSERT INTO github_repositories (user_id,installation_id,github_repository_id,full_name,owner_login,name,default_branch,is_private,active,updated_at)
+      VALUES (${userId},${installationId},${repository.id},${repository.full_name},${String(repository.owner?.login || '')},${repository.name},${repository.default_branch || 'main'},${Boolean(repository.private)},true,NOW())
+      ON CONFLICT (user_id,github_repository_id) DO UPDATE SET installation_id=EXCLUDED.installation_id,full_name=EXCLUDED.full_name,owner_login=EXCLUDED.owner_login,name=EXCLUDED.name,default_branch=EXCLUDED.default_branch,is_private=EXCLUDED.is_private,active=true,updated_at=NOW()`;
+  }
+  return repositories.length;
+}
+
+app.post('/api/github/webhook', express.raw({ type: 'application/json' }), asyncRoute(async (req, res) => {
+  const rawBody = req.body;
+  if (!Buffer.isBuffer(rawBody) || !verifyWebhook(rawBody, req.header('x-hub-signature-256'))) return res.status(401).json({ error: 'Assinatura do webhook inválida.' });
+  await ensureSchema();
+  const deliveryId = String(req.header('x-github-delivery') || '');
+  const eventName = String(req.header('x-github-event') || '');
+  if (!deliveryId) return res.status(400).json({ error: 'Entrega do GitHub inválida.' });
+  const payload = JSON.parse(rawBody.toString('utf8'));
+  const installationId = Number(payload.installation?.id) || null;
+  const inserted = await sql`INSERT INTO github_webhook_events (delivery_id,event_name,installation_id) VALUES (${deliveryId},${eventName},${installationId}) ON CONFLICT (delivery_id) DO NOTHING RETURNING delivery_id`;
+  if (!inserted[0]) return res.status(202).json({ ok: true, duplicate: true });
+  if (eventName === 'push' && payload.repository?.id && installationId) {
+    const repositories = await sql`SELECT id FROM github_repositories WHERE github_repository_id=${Number(payload.repository.id)} AND installation_id=${installationId} AND active=true`;
+    const commits = Array.isArray(payload.commits) ? payload.commits.map((commit) => ({
+      sha: commit.id,
+      commit: { message: commit.message, author: { name: commit.author?.name, date: commit.timestamp } },
+      author: { login: commit.author?.username || '' },
+      html_url: `${payload.repository.html_url}/commit/${commit.id}`
+    })) : [];
+    await Promise.all(repositories.map((repository) => storeRepositoryCommits(repository.id, commits)));
+  }
+  res.status(202).json({ ok: true });
+}));
 app.use(express.json());
 app.get('/api/health', asyncRoute(async (_req, res) => {
   if (!databaseConfigured) return res.status(503).json({ ok: false, code: 'DATABASE_URL_MISSING' });
@@ -27,6 +79,12 @@ app.get('/api/public/client/:token', asyncRoute(async (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json(portal);
 }));
+app.get('/api/github/callback', (_req, res) => res.redirect(302, callbackBaseUrl(_req)));
+app.get('/api/github/setup', (req, res) => {
+  const installationId = Number(req.query.installation_id);
+  if (!Number.isInteger(installationId) || installationId <= 0) return res.redirect(302, callbackBaseUrl(req));
+  res.redirect(302, `${callbackBaseUrl(req)}/?github_installation_id=${encodeURIComponent(installationId)}`);
+});
 
 const publicUser = ({ id, name, email }) => ({ id, name, email });
 const hashPassword = (password, salt = crypto.randomBytes(16).toString('hex')) => ({
@@ -108,6 +166,32 @@ app.post('/api/auth/recover', asyncRoute(async (req, res) => {
 
 app.use('/api', requireUser);
 app.get('/api/dashboard', asyncRoute(async (req, res) => res.json(await dashboardPayload(req.user.id))));
+app.get('/api/github/status', asyncRoute(async (req, res) => {
+  const installations = await sql`SELECT installation_id,account_login,account_type,installed_at,updated_at FROM github_installations WHERE user_id=${req.user.id} ORDER BY updated_at DESC`;
+  const repositories = await sql`SELECT id,installation_id,full_name,name,default_branch,is_private,active,updated_at FROM github_repositories WHERE user_id=${req.user.id} AND active=true ORDER BY LOWER(full_name)`;
+  res.json({ configured: githubConfigured(), installationUrl: githubConfigured() ? installationUrl() : null, installations, repositories });
+}));
+app.post('/api/github/installations/attach', asyncRoute(async (req, res) => {
+  if (!githubConfigured()) return res.status(503).json({ error: 'A integração GitHub ainda não está configurada no ambiente.' });
+  const installationId = Number(req.body.installationId);
+  if (!Number.isInteger(installationId) || installationId <= 0) return res.status(400).json({ error: 'Instalação GitHub inválida.' });
+  const repositoryCount = await syncInstallationRepositories(req.user.id, installationId);
+  res.json({ ok: true, repositoryCount });
+}));
+app.post('/api/github/repositories/:id/sync', asyncRoute(async (req, res) => {
+  if (!githubConfigured()) return res.status(503).json({ error: 'A integração GitHub ainda não está configurada no ambiente.' });
+  const [repository] = await sql`SELECT * FROM github_repositories WHERE id=${Number(req.params.id)} AND user_id=${req.user.id} AND active=true`;
+  if (!repository) return res.status(404).json({ error: 'Repositório não encontrado.' });
+  const commits = await getRepositoryCommits(repository.installation_id, repository.full_name);
+  await storeRepositoryCommits(repository.id, commits);
+  res.json({ ok: true, commits: commits.length });
+}));
+app.get('/api/github/repositories/:id/commits', asyncRoute(async (req, res) => {
+  const [repository] = await sql`SELECT id FROM github_repositories WHERE id=${Number(req.params.id)} AND user_id=${req.user.id} AND active=true`;
+  if (!repository) return res.status(404).json({ error: 'Repositório não encontrado.' });
+  const commits = await sql`SELECT * FROM github_commits WHERE repository_id=${repository.id} ORDER BY committed_at DESC NULLS LAST,id DESC LIMIT 30`;
+  res.json({ commits });
+}));
 app.patch('/api/settings', asyncRoute(async (req, res) => {
   const current = await getSettings(req.user.id);
   const rate = req.body.defaultRate === undefined ? current.default_rate_cents : centsFromReais(req.body.defaultRate);
@@ -179,6 +263,17 @@ app.patch('/api/services/:id/adjustment', requireService, asyncRoute(async (req,
   if (amount === null || amount < 0 || !type) return res.status(400).json({ error: 'Informe um ajuste válido.' });
   await sql`UPDATE services SET discount_cents=${amount},adjustment_type=${type} WHERE id=${req.service.id} AND user_id=${req.user.id}`;
   await updateComputedStatus(req.service.id, req.user.id);
+  res.json(await dashboardPayload(req.user.id));
+}));
+app.post('/api/services/:id/github/commits', requireService, asyncRoute(async (req, res) => {
+  const commitId = Number(req.body.commitId);
+  const [commit] = await sql`SELECT gc.id FROM github_commits gc JOIN github_repositories gr ON gr.id=gc.repository_id WHERE gc.id=${commitId} AND gr.user_id=${req.user.id} AND gr.active=true`;
+  if (!commit) return res.status(404).json({ error: 'Commit não encontrado neste usuário.' });
+  await sql`INSERT INTO service_github_commits (service_id,commit_id) VALUES (${req.service.id},${commit.id}) ON CONFLICT DO NOTHING`;
+  res.json(await dashboardPayload(req.user.id));
+}));
+app.delete('/api/services/:id/github/commits/:commitId', requireService, asyncRoute(async (req, res) => {
+  await sql`DELETE FROM service_github_commits sgc USING github_commits gc, github_repositories gr WHERE sgc.service_id=${req.service.id} AND sgc.commit_id=${Number(req.params.commitId)} AND gc.id=sgc.commit_id AND gr.id=gc.repository_id AND gr.user_id=${req.user.id}`;
   res.json(await dashboardPayload(req.user.id));
 }));
 app.delete('/api/services/:id', requireService, asyncRoute(async (req, res) => {

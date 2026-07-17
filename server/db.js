@@ -79,6 +79,54 @@ export function ensureSchema() {
       consumed_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`;
+    await sql`CREATE TABLE IF NOT EXISTS github_installations (
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      installation_id BIGINT NOT NULL UNIQUE,
+      account_login TEXT NOT NULL DEFAULT '',
+      account_type TEXT NOT NULL DEFAULT '',
+      installed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS github_installations_user_installation_idx ON github_installations (user_id, installation_id)`;
+    await sql`CREATE TABLE IF NOT EXISTS github_repositories (
+      id BIGSERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      installation_id BIGINT NOT NULL REFERENCES github_installations(installation_id) ON DELETE CASCADE,
+      github_repository_id BIGINT NOT NULL,
+      full_name TEXT NOT NULL,
+      owner_login TEXT NOT NULL DEFAULT '',
+      name TEXT NOT NULL,
+      default_branch TEXT NOT NULL DEFAULT 'main',
+      is_private BOOLEAN NOT NULL DEFAULT TRUE,
+      active BOOLEAN NOT NULL DEFAULT TRUE,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (user_id, github_repository_id)
+    )`;
+    await sql`CREATE TABLE IF NOT EXISTS github_commits (
+      id BIGSERIAL PRIMARY KEY,
+      repository_id BIGINT NOT NULL REFERENCES github_repositories(id) ON DELETE CASCADE,
+      sha TEXT NOT NULL,
+      message TEXT NOT NULL DEFAULT '',
+      author_name TEXT NOT NULL DEFAULT '',
+      author_login TEXT NOT NULL DEFAULT '',
+      committed_at TIMESTAMPTZ,
+      html_url TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (repository_id, sha)
+    )`;
+    await sql`CREATE TABLE IF NOT EXISTS service_github_commits (
+      service_id BIGINT NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+      commit_id BIGINT NOT NULL REFERENCES github_commits(id) ON DELETE CASCADE,
+      linked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (service_id, commit_id)
+    )`;
+    await sql`CREATE TABLE IF NOT EXISTS github_webhook_events (
+      delivery_id TEXT PRIMARY KEY,
+      event_name TEXT NOT NULL,
+      installation_id BIGINT,
+      received_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
   })();
   return schemaPromise;
 }
@@ -110,12 +158,13 @@ export async function getClients(userId) {
 }
 
 async function decorateService(service, userId) {
-  const [clientRecord, entries, payments] = await Promise.all([
+  const [clientRecord, entries, payments, githubCommits] = await Promise.all([
     service.client_id
       ? sql`SELECT * FROM clients WHERE id = ${service.client_id} AND user_id = ${userId}`.then((rows) => rows[0] || null)
       : null,
     sql`SELECT * FROM time_entries WHERE service_id = ${service.id} ORDER BY work_date DESC, start_time DESC, id DESC`,
-    sql`SELECT * FROM payments WHERE service_id = ${service.id} ORDER BY created_at DESC, id DESC`
+    sql`SELECT * FROM payments WHERE service_id = ${service.id} ORDER BY created_at DESC, id DESC`,
+    sql`SELECT gc.*, gr.full_name AS repository_full_name FROM service_github_commits sgc JOIN github_commits gc ON gc.id=sgc.commit_id JOIN github_repositories gr ON gr.id=gc.repository_id WHERE sgc.service_id=${service.id} ORDER BY gc.committed_at DESC NULLS LAST, gc.id DESC`
   ]);
   const workedMinutes = entries.reduce((sum, item) => sum + item.minutes, 0);
   const billingType = ['hourly', 'daily', 'fixed'].includes(service.billing_type) ? service.billing_type : 'hourly';
@@ -140,6 +189,7 @@ async function decorateService(service, userId) {
     clientRecord,
     entries,
     payments,
+    githubCommits,
     workedMinutes,
     hoursCents: baseCents,
     baseCents,

@@ -14,6 +14,7 @@ import {
   EyeOff,
   Pencil,
   Hourglass,
+  Github,
   Link2,
   Plus,
   Printer,
@@ -683,6 +684,18 @@ function App() {
     if (user) refresh().catch((err) => setError(err.message));
   }, [user?.id]);
 
+  useEffect(() => {
+    const installationId = new URLSearchParams(window.location.search).get('github_installation_id');
+    if (!user || !installationId) return;
+    api('/api/github/installations/attach', { method: 'POST', body: JSON.stringify({ installationId: Number(installationId) }) })
+      .then((result) => {
+        window.history.replaceState({}, '', window.location.pathname);
+        setError(`GitHub conectado: ${result.repositoryCount} repositório(s) disponível(is).`);
+        return refresh();
+      })
+      .catch((err) => setError(err.message));
+  }, [user?.id]);
+
   if (!user) {
     return (
       <I18nContext.Provider value={{ language, setLanguage, t }}>
@@ -1317,6 +1330,7 @@ function ServiceDetail({ service, clients, run, busy }) {
       <PaymentForm service={service} run={run} busy={busy} />
       <EntriesTable service={service} run={run} busy={busy} />
       <PaymentsTable service={service} />
+      <GithubServicePanel service={service} run={run} busy={busy} />
 
       {receiptOpen ? (
         <Modal title={t('receiptTitle')} onClose={() => setReceiptOpen(false)}>
@@ -1368,6 +1382,94 @@ function ServiceDetail({ service, clients, run, busy }) {
         </Modal>
       ) : null}
     </div>
+  );
+}
+
+function GithubServicePanel({ service, run, busy }) {
+  const [status, setStatus] = useState(null);
+  const [repositoryId, setRepositoryId] = useState('');
+  const [commits, setCommits] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState('');
+
+  async function loadStatus() {
+    setLoading(true);
+    try {
+      const data = await api('/api/github/status');
+      setStatus(data);
+      if (!repositoryId && data.repositories?.[0]) setRepositoryId(String(data.repositories[0].id));
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { loadStatus(); }, []);
+
+  async function loadCommits(id = repositoryId) {
+    if (!id) return;
+    setLoading(true);
+    setMessage('');
+    try {
+      await api(`/api/github/repositories/${id}/sync`, { method: 'POST' });
+      const data = await api(`/api/github/repositories/${id}/commits`);
+      setCommits(data.commits || []);
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const linked = new Set((service.githubCommits || []).map((commit) => commit.id));
+  return (
+    <section className="panel github-panel">
+      <div className="section-heading">
+        <span className="github-heading"><Github size={18} /><strong>GitHub</strong></span>
+        <small>Commits vinculados ao serviço</small>
+      </div>
+      {!status?.configured && !loading ? (
+        <p className="github-empty">A integração GitHub ainda não está configurada no ambiente de produção.</p>
+      ) : null}
+      {status?.configured && !status.installations?.length ? (
+        <div className="github-empty">
+          <p>Instale o WorkLedger no repositório ou organização que deseja acompanhar.</p>
+          <a className="receipt-action" href={status.installationUrl}> <Github size={16} /> Instalar GitHub App</a>
+        </div>
+      ) : null}
+      {status?.repositories?.length ? (
+        <div className="github-controls">
+          <select value={repositoryId} onChange={(event) => { setRepositoryId(event.target.value); setCommits([]); }}>
+            {status.repositories.map((repository) => <option key={repository.id} value={repository.id}>{repository.full_name}</option>)}
+          </select>
+          <button type="button" className="secondary-button" disabled={loading || busy} onClick={() => loadCommits()}><Github size={16} /> Sincronizar commits</button>
+        </div>
+      ) : null}
+      {message ? <p className="github-message">{message}</p> : null}
+      {service.githubCommits?.length ? (
+        <div className="github-linked-list">
+          <strong>Vinculados a este serviço</strong>
+          {service.githubCommits.map((commit) => (
+            <div className="github-commit" key={commit.id}>
+              <span><b>{commit.repository_full_name}</b><a href={commit.html_url} target="_blank" rel="noreferrer">{commit.sha.slice(0, 7)}</a><small>{commit.message}</small></span>
+              <button type="button" aria-label="Remover vínculo" disabled={busy} onClick={() => run(() => api(`/api/services/${service.id}/github/commits/${commit.id}`, { method: 'DELETE' }))}><X size={15} /></button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {commits.length ? (
+        <div className="github-commit-list">
+          <strong>Commits recentes</strong>
+          {commits.map((commit) => (
+            <div className="github-commit" key={commit.id}>
+              <span><a href={commit.html_url} target="_blank" rel="noreferrer">{commit.sha.slice(0, 7)}</a><b>{commit.message}</b><small>{commit.author_name || commit.author_login || 'Autor não informado'}</small></span>
+              <button type="button" className={linked.has(commit.id) ? 'secondary-button' : 'receipt-action'} disabled={busy || linked.has(commit.id)} onClick={() => run(() => api(`/api/services/${service.id}/github/commits`, { method: 'POST', body: JSON.stringify({ commitId: commit.id }) }))}>{linked.has(commit.id) ? 'Vinculado' : 'Vincular'}</button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </section>
   );
 }
 
