@@ -3,18 +3,24 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  centsFromReais, ensureSchema, ensureUserSettings, getClients, getService,
+  centsFromReais, databaseConfigured, ensureSchema, ensureUserSettings, getClients, getService,
   getServices, getSettings, minutesBetween, sql, updateComputedStatus
 } from './db.js';
 
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 app.use(express.json());
+app.get('/api/health', asyncRoute(async (_req, res) => {
+  if (!databaseConfigured) return res.status(503).json({ ok: false, code: 'DATABASE_URL_MISSING' });
+  await ensureSchema();
+  await sql`SELECT 1`;
+  res.json({ ok: true, database: 'connected' });
+}));
 app.use(async (_req, _res, next) => {
   try { await ensureSchema(); next(); } catch (error) { next(error); }
 });
 
-const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 const publicUser = ({ id, name, email }) => ({ id, name, email });
 const hashPassword = (password, salt = crypto.randomBytes(16).toString('hex')) => ({
   salt, hash: crypto.pbkdf2Sync(password, salt, 120000, 64, 'sha512').toString('hex')

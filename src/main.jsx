@@ -137,7 +137,7 @@ const messages = {
     authSwitchLogin: 'Já tenho conta',
     authSwitchRegister: 'Criar conta',
     authSwitchRecover: 'Esqueci minha senha',
-    authHelp: 'Os dados ficam neste banco SQLite local. O login salvo no navegador mantém sua sessão neste computador.',
+    authHelp: 'Seus dados ficam protegidos na nuvem. O login salvo no navegador mantém sua sessão neste computador.',
     signedAs: 'Conectado como'
   },
   en: {
@@ -251,7 +251,7 @@ const messages = {
     authSwitchLogin: 'I already have an account',
     authSwitchRegister: 'Create account',
     authSwitchRecover: 'Forgot password',
-    authHelp: 'Data stays in this local SQLite database. The browser-saved login keeps your session on this computer.',
+    authHelp: 'Your data is securely stored in the cloud. The browser-saved login keeps your session on this computer.',
     signedAs: 'Signed in as'
   }
 };
@@ -595,7 +595,7 @@ function AuthScreen({ onAuth }) {
         body: JSON.stringify(mode === 'recover' ? { password: form.password, token: resetToken } : form)
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || 'Auth error');
+      if (!response.ok) throw new Error(data.error || `Erro HTTP ${response.status}. A API não retornou uma resposta válida.`);
       if (mode === 'recover') window.history.replaceState({}, '', window.location.pathname);
       onAuth(data.user);
     } catch (err) {

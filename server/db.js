@@ -1,9 +1,13 @@
 import { neon } from '@neondatabase/serverless';
 
 const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL;
-if (!connectionString) throw new Error('DATABASE_URL não configurada.');
+const unavailable = async () => {
+  throw new Error('DATABASE_URL não configurada no ambiente da Function.');
+};
+unavailable.query = unavailable;
 
-export const sql = neon(connectionString);
+export const sql = connectionString ? neon(connectionString) : unavailable;
+export const databaseConfigured = Boolean(connectionString);
 
 let schemaPromise;
 export function ensureSchema() {
