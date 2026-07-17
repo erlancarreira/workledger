@@ -720,6 +720,151 @@ h3 {
   cursor: pointer;
 }
 
+.success-message {
+  grid-column: 1 / -1;
+  padding: 10px 12px;
+  border: 1px solid #9dd8cc;
+  border-radius: 8px;
+  color: #0b6257;
+  background: #ecfaf7;
+  font-size: 0.82rem;
+}
+
+.portal-shell {
+  width: min(1120px, calc(100% - 32px));
+  margin: 32px auto;
+}
+
+.portal-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 28px;
+  border-radius: 16px;
+  color: #fff;
+  background: #112d2b;
+  box-shadow: var(--shadow);
+}
+
+.portal-header > div:first-child {
+  flex: 1;
+}
+
+.portal-header h1 {
+  margin: 4px 0;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4vw, 3.25rem);
+}
+
+.portal-client {
+  display: grid;
+  gap: 4px;
+  min-width: 210px;
+  padding: 14px 18px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 10px;
+  background: rgb(255 255 255 / 7%);
+}
+
+.portal-client span {
+  color: #a9c5c1;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.portal-totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.portal-currency {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: var(--shadow-soft);
+}
+
+.portal-currency > div,
+.portal-payments span {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.portal-currency .portal-balance {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  color: var(--primary-strong);
+}
+
+.portal-service {
+  padding: 20px 0;
+  border-top: 1px solid var(--border);
+}
+
+.portal-service-heading,
+.portal-service-values {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.portal-service-heading h2 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+
+.portal-service-heading span {
+  color: var(--muted-strong);
+  font-size: 0.8rem;
+}
+
+.portal-service-values {
+  margin-top: 16px;
+}
+
+.portal-service-values > span {
+  display: grid;
+  gap: 4px;
+  min-width: 120px;
+  color: var(--muted-strong);
+  font-size: 0.75rem;
+}
+
+.portal-service-values b {
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.portal-payments {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--surface-muted);
+  font-size: 0.8rem;
+}
+
+@media (max-width: 700px) {
+  .portal-header,
+  .portal-service-heading,
+  .portal-service-values {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .portal-client {
+    min-width: 0;
+  }
+}
+
 .inline-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

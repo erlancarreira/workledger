@@ -27,6 +27,8 @@ export function ensureSchema() {
       notes TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`;
+    await sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS portal_token_hash TEXT`;
+    await sql`CREATE UNIQUE INDEX IF NOT EXISTS clients_portal_token_hash_idx ON clients (portal_token_hash) WHERE portal_token_hash IS NOT NULL`;
     await sql`CREATE TABLE IF NOT EXISTS user_settings (
       user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
       default_rate_cents INTEGER NOT NULL DEFAULT 15000,
@@ -144,6 +146,21 @@ export async function getServices(userId) {
 export async function getService(id, userId) {
   const [service] = await sql`SELECT * FROM services WHERE id = ${id} AND user_id = ${userId}`;
   return service ? decorateService(service, userId) : null;
+}
+
+export async function getClientPortal(tokenHash) {
+  const [client] = await sql`SELECT id,name FROM clients WHERE portal_token_hash=${tokenHash}`;
+  if (!client) return null;
+  const services = await sql`SELECT * FROM services WHERE client_id=${client.id} ORDER BY service_date DESC,service_time DESC,id DESC`;
+  const decorated = await Promise.all(services.map((service) => decorateService(service, service.user_id)));
+  const totals = decorated.reduce((result, service) => {
+    result[service.currency] ||= { totalCents: 0, paidCents: 0, balanceCents: 0 };
+    result[service.currency].totalCents += service.totalCents;
+    result[service.currency].paidCents += service.paidCents;
+    if (service.status !== 'transferred') result[service.currency].balanceCents += service.balanceCents;
+    return result;
+  }, {});
+  return { client: { name: client.name }, totals, services: decorated };
 }
 
 export async function updateComputedStatus(serviceId, userId) {

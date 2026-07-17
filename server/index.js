@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  centsFromReais, databaseConfigured, ensureSchema, ensureUserSettings, getClients, getService,
+  centsFromReais, databaseConfigured, ensureSchema, ensureUserSettings, getClientPortal, getClients, getService,
   getServices, getSettings, minutesBetween, sql, updateComputedStatus
 } from './db.js';
 
@@ -20,6 +20,13 @@ app.get('/api/health', asyncRoute(async (_req, res) => {
 app.use(async (_req, _res, next) => {
   try { await ensureSchema(); next(); } catch (error) { next(error); }
 });
+app.get('/api/public/client/:token', asyncRoute(async (req, res) => {
+  const tokenHash = crypto.createHash('sha256').update(String(req.params.token || '')).digest('hex');
+  const portal = await getClientPortal(tokenHash);
+  if (!portal) return res.status(404).json({ error: 'Link inválido ou desativado.' });
+  res.set('Cache-Control', 'no-store');
+  res.json(portal);
+}));
 
 const publicUser = ({ id, name, email }) => ({ id, name, email });
 const hashPassword = (password, salt = crypto.randomBytes(16).toString('hex')) => ({
@@ -122,6 +129,18 @@ app.patch('/api/clients/:id', asyncRoute(async (req, res) => {
   if (!rows[0]) return res.status(404).json({ error: 'Cliente não encontrado.' });
   await sql`UPDATE services SET client=${name} WHERE client_id=${id} AND user_id=${req.user.id}`;
   res.json(await dashboardPayload(req.user.id));
+}));
+app.post('/api/clients/:id/share-link', asyncRoute(async (req, res) => {
+  const token = crypto.randomBytes(32).toString('base64url');
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const rows = await sql`UPDATE clients SET portal_token_hash=${tokenHash} WHERE id=${Number(req.params.id)} AND user_id=${req.user.id} RETURNING id`;
+  if (!rows[0]) return res.status(404).json({ error: 'Cliente não encontrado.' });
+  res.json({ token });
+}));
+app.delete('/api/clients/:id/share-link', asyncRoute(async (req, res) => {
+  const rows = await sql`UPDATE clients SET portal_token_hash=NULL WHERE id=${Number(req.params.id)} AND user_id=${req.user.id} RETURNING id`;
+  if (!rows[0]) return res.status(404).json({ error: 'Cliente não encontrado.' });
+  res.json({ ok: true });
 }));
 app.delete('/api/clients/:id', asyncRoute(async (req, res) => {
   const rows = await sql`DELETE FROM clients WHERE id=${Number(req.params.id)} AND user_id=${req.user.id} RETURNING id`;

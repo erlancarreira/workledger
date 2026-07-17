@@ -13,6 +13,7 @@ import {
   EyeOff,
   Pencil,
   Hourglass,
+  Link2,
   Plus,
   Printer,
   ReceiptText,
@@ -59,6 +60,15 @@ const messages = {
     createService: 'Criar serviço',
     clients: 'Clientes',
     clientsHelp: 'Cadastre, edite e relacione clientes aos serviços.',
+    clientPortal: 'Portal do cliente',
+    copyPortalLink: 'Gerar e copiar link',
+    portalLinkCopied: 'Link do cliente copiado.',
+    portalTitle: 'Histórico financeiro',
+    portalSubtitle: 'Acompanhe serviços, pagamentos e valores em aberto.',
+    amountBilled: 'Total cobrado',
+    amountPaid: 'Total pago',
+    amountOutstanding: 'Saldo em aberto',
+    paymentHistory: 'Histórico de pagamentos',
     name: 'Nome',
     addClient: 'Adicionar cliente',
     saveClient: 'Salvar cliente',
@@ -173,6 +183,15 @@ const messages = {
     createService: 'Create service',
     clients: 'Clients',
     clientsHelp: 'Create, edit, and link clients to services.',
+    clientPortal: 'Client portal',
+    copyPortalLink: 'Generate and copy link',
+    portalLinkCopied: 'Client link copied.',
+    portalTitle: 'Financial history',
+    portalSubtitle: 'Review services, payments, and outstanding balances.',
+    amountBilled: 'Total billed',
+    amountPaid: 'Total paid',
+    amountOutstanding: 'Outstanding',
+    paymentHistory: 'Payment history',
     name: 'Name',
     addClient: 'Add client',
     saveClient: 'Save client',
@@ -431,6 +450,79 @@ function StatusBadge({ status }) {
   return <span className={`badge ${status}`}>{labels[status] || status}</span>;
 }
 
+function ClientPortal({ token }) {
+  const { t, language } = useI18n();
+  const [data, setData] = useState(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetch(`/api/public/client/${encodeURIComponent(token)}`)
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || 'Não foi possível abrir o portal.');
+        return payload;
+      })
+      .then(setData)
+      .catch((reason) => setError(reason.message));
+  }, [token]);
+
+  if (error) return <main className="loading"><div className="error">{error}</div></main>;
+  if (!data) return <main className="loading">{t('loading')}</main>;
+
+  return (
+    <main className="portal-shell">
+      <header className="portal-header">
+        <div>
+          <p className="eyebrow">WorkLedger</p>
+          <h1>{t('portalTitle')}</h1>
+          <p className="subtitle">{t('portalSubtitle')}</p>
+        </div>
+        <div className="portal-client">
+          <span>{t('client')}</span>
+          <strong>{data.client.name}</strong>
+        </div>
+        <LanguageSwitcher />
+      </header>
+
+      <section className="portal-totals">
+        {Object.entries(data.totals).map(([currency, totals]) => (
+          <article className="portal-currency" key={currency}>
+            <strong>{currency}</strong>
+            <div><span>{t('amountBilled')}</span><b>{centsToMoney(totals.totalCents, currency, language)}</b></div>
+            <div><span>{t('amountPaid')}</span><b>{centsToMoney(totals.paidCents, currency, language)}</b></div>
+            <div className="portal-balance"><span>{t('amountOutstanding')}</span><b>{centsToMoney(totals.balanceCents, currency, language)}</b></div>
+          </article>
+        ))}
+      </section>
+
+      <section className="panel portal-history">
+        <div className="section-heading"><strong>{t('services')}</strong><span>{data.services.length} {t(data.services.length === 1 ? 'record' : 'records')}</span></div>
+        {data.services.map((service) => (
+          <article className="portal-service" key={service.id}>
+            <div className="portal-service-heading">
+              <div><h2>{service.title}</h2><span>{serviceDateLabel(service, t)} · {minutesToLabel(service.workedMinutes)}</span></div>
+              <StatusBadge status={service.status} />
+            </div>
+            <div className="portal-service-values">
+              <span>{t('total')}<b>{centsToMoney(service.totalCents, service.currency, language)}</b></span>
+              <span>{t('paidTotal')}<b>{centsToMoney(service.paidCents, service.currency, language)}</b></span>
+              <span>{t('balance')}<b>{centsToMoney(service.balanceCents, service.currency, language)}</b></span>
+            </div>
+            {service.payments.length ? (
+              <div className="portal-payments">
+                <strong>{t('paymentHistory')}</strong>
+                {service.payments.map((payment) => (
+                  <span key={payment.id}>{new Date(payment.created_at).toLocaleDateString(language === 'en' ? 'en-US' : 'pt-BR')}<b>{centsToMoney(payment.amount_cents, service.currency, language)}</b></span>
+                ))}
+              </div>
+            ) : null}
+          </article>
+        ))}
+      </section>
+    </main>
+  );
+}
+
 function App() {
   const [language, setLanguageState] = useState(() => localStorage.getItem('workledger-language') || 'pt');
   const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('workledger-user') || 'null'));
@@ -439,6 +531,7 @@ function App() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const t = (key) => messages[language]?.[key] || messages.pt[key] || key;
+  const portalToken = new URLSearchParams(window.location.search).get('client_portal');
 
   function setLanguage(nextLanguage) {
     setLanguageState(nextLanguage);
@@ -454,6 +547,14 @@ function App() {
       setDashboard(null);
       setSelectedId(null);
     }
+  }
+
+  if (portalToken) {
+    return (
+      <I18nContext.Provider value={{ language, setLanguage, t }}>
+        <ClientPortal token={portalToken} />
+      </I18nContext.Provider>
+    );
   }
 
   const selected = useMemo(() => {
@@ -879,6 +980,7 @@ function NewServiceForm({ dashboard, run, busy, onCreated }) {
 function ClientManager({ clients, run, busy }) {
   const { t } = useI18n();
   const [form, setForm] = useState({ id: null, name: '', notes: '' });
+  const [portalStatus, setPortalStatus] = useState('');
   const editing = Boolean(form.id);
 
   function reset() {
@@ -934,6 +1036,7 @@ function ClientManager({ clients, run, busy }) {
       </form>
 
       <div className="client-list">
+        {portalStatus ? <div className="success-message">{portalStatus}</div> : null}
         {clients.length ? clients.map((client) => (
           <div className="client-row" key={client.id}>
             <span>
@@ -941,6 +1044,24 @@ function ClientManager({ clients, run, busy }) {
               <small>{client.notes || t('noNotes')}</small>
             </span>
             <div>
+              <button
+                type="button"
+                className="icon-button"
+                title={t('copyPortalLink')}
+                disabled={busy}
+                onClick={async () => {
+                  try {
+                    const result = await api(`/api/clients/${client.id}/share-link`, { method: 'POST' });
+                    const link = `${window.location.origin}/?client_portal=${encodeURIComponent(result.token)}`;
+                    await navigator.clipboard.writeText(link);
+                    setPortalStatus(t('portalLinkCopied'));
+                  } catch (error) {
+                    setPortalStatus(error.message);
+                  }
+                }}
+              >
+                <Link2 size={15} />
+              </button>
               <button
                 type="button"
                 className="icon-button"
