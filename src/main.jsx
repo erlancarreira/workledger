@@ -1157,14 +1157,16 @@ function GithubDefaultRepositoryEditor({ dashboard, run, busy }) {
       run(() => api('/api/settings', { method: 'PATCH', body: JSON.stringify({ defaultGithubRepositoryId: repositoryId }) }));
     }}>
       <div className="github-preference-title"><span className="github-preference-icon"><Github size={18} /></span><div><strong>Integração GitHub</strong><small>Este repositório será sugerido em novos serviços e poderá ser alterado em cada item.</small></div></div>
-      <label className="github-repository-default-field">
-        <span>Repositório padrão</span>
-        <select value={repositoryId} onChange={(event) => setRepositoryId(event.target.value)}>
-          <option value="">Sem repositório</option>
-          {dashboard.githubRepositories.map((repository) => <option key={repository.id} value={repository.id}>{repository.full_name}</option>)}
-        </select>
-      </label>
-      <button type="submit" disabled={busy} title="Salvar repositório padrão"><Save size={17} /></button>
+      <div className="github-default-control">
+        <label className="github-repository-default-field">
+          <span>Repositório padrão</span>
+          <select value={repositoryId} onChange={(event) => setRepositoryId(event.target.value)}>
+            <option value="">Sem repositório</option>
+            {dashboard.githubRepositories.map((repository) => <option key={repository.id} value={repository.id}>{repository.full_name}</option>)}
+          </select>
+        </label>
+        <button type="submit" disabled={busy} title="Salvar repositório padrão"><Save size={17} /></button>
+      </div>
       <button type="button" className="secondary-button github-manage-button" disabled={busy} onClick={() => { setManaging((value) => !value); if (!managing) loadAvailableInstallations(); }}>{managing ? 'Fechar' : 'Trocar conta'}</button>
       {managing ? <div className="github-preference-manager">{connectionManager}</div> : null}
       {error ? <em>{error}</em> : null}

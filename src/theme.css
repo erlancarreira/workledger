@@ -359,11 +359,11 @@ h3 {
 
 .workspace-preferences {
   display: grid;
-  grid-template-columns: minmax(220px, .62fr) minmax(0, 1fr);
-  align-items: center;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 16px;
   margin: -2px 0 18px;
-  padding: 12px 14px;
+  padding: 20px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: rgba(255, 255, 255, .72);
@@ -473,8 +473,8 @@ h3 {
 
 .preferences-core {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, .82fr);
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
 }
 
 .github-service-field small {
@@ -501,9 +501,9 @@ h3 {
 .github-preference-card {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(230px, .75fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 14px;
+  gap: 16px 12px;
   min-width: 0;
   padding: 16px;
   border: 1px solid #c8ddd9;
@@ -516,6 +516,29 @@ h3 {
   align-items: center;
   gap: 10px;
   min-width: 0;
+}
+
+.github-preference-card.is-ready .github-preference-title {
+  grid-column: 1 / -1;
+}
+
+.github-default-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+  min-width: 0;
+}
+
+.github-default-control > button {
+  width: 44px;
+  min-height: 42px;
+  padding: 0;
+}
+
+.github-preference-card.is-ready .github-manage-button {
+  min-width: 150px;
+  align-self: end;
 }
 
 .github-preference-title > div { display: grid; gap: 3px; }
@@ -2213,10 +2236,10 @@ h3 {
 
 @media (max-width: 1120px) {
   .workspace-preferences {
-    grid-template-columns: minmax(190px, .6fr) minmax(0, 1fr);
+    grid-template-columns: 1fr;
   }
 
-  .github-preference-card { grid-template-columns: minmax(0, 1fr) minmax(210px, .8fr) auto; }
+  .github-preference-card { grid-template-columns: minmax(0, 1fr) auto; }
 
   .workspace {
     grid-template-columns: 1fr;
@@ -2246,7 +2269,7 @@ h3 {
     grid-template-columns: 1fr;
   }
 
-  .github-preference-card { grid-template-columns: minmax(0, 1fr) minmax(220px, .8fr) auto; }
+  .github-preference-card { grid-template-columns: minmax(0, 1fr) auto; }
 
   .stats-grid,
   .detail-grid {
@@ -2487,6 +2510,16 @@ h3 {
 
   .settings-panel .workspace-preferences {
     grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .settings-panel .preferences-core,
+  .settings-panel .github-preference-card {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-panel .github-preference-card.is-ready .github-manage-button {
+    width: 100%;
   }
 
   .session-footer {
