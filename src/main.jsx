@@ -4,6 +4,7 @@ import { toBlob, toPng } from 'html-to-image';
 import {
   ArrowLeft,
   Banknote,
+  BriefcaseBusiness,
   CalendarDays,
   Check,
   Clock3,
@@ -16,14 +17,16 @@ import {
   Hourglass,
   Github,
   Link2,
+  LayoutDashboard,
   LogOut,
   Plus,
   Printer,
   ReceiptText,
   Save,
   Send,
-  Settings,
+  SlidersHorizontal,
   Trash2,
+  UserRound,
   Users,
   WalletCards,
   X
@@ -758,8 +761,9 @@ function App() {
   return (
     <I18nContext.Provider value={{ language, setLanguage, t }}>
     <div className="min-h-screen lg:flex">
-      <NavRail t={t} activeView={mobileView} onSelectView={(view) => { setMobileView(view); setMobileDetail(false); }} onLogout={() => persistUser(null)} />
+      <NavRail t={t} activeView={mobileView} onSelectView={(view) => { setMobileView(view); setMobileDetail(false); }} />
       <main className="app-shell flex min-h-screen flex-col lg:flex-1 lg:min-w-0 lg:px-10 lg:py-8 xl:px-14">
+      <AppHeader t={t} onLogout={() => persistUser(null)} />
 
       {error ? <div className="error">{error}</div> : null}
 
@@ -832,35 +836,47 @@ function App() {
       </section>
       <nav className="mobile-nav" aria-label="Navegação principal">
         <button type="button" className={mobileView === 'overview' ? 'active' : ''} onClick={() => { setMobileView('overview'); setMobileDetail(false); }}>
-          <WalletCards size={19} /><span>{t('overview')}</span>
+          <LayoutDashboard size={19} /><span>{t('overview')}</span>
         </button>
         <button type="button" className={mobileView === 'services' ? 'active' : ''} onClick={() => { setMobileView('services'); setMobileDetail(false); }}>
-          <ReceiptText size={19} /><span>{t('services')}</span>
+          <BriefcaseBusiness size={19} /><span>{t('services')}</span>
         </button>
         <button type="button" className={mobileView === 'new' ? 'active' : ''} onClick={() => { setMobileView('new'); setMobileDetail(false); }}>
           <Plus size={19} /><span>{t('newService')}</span>
         </button>
         <button type="button" className={mobileView === 'clients' ? 'active' : ''} onClick={() => { setMobileView('clients'); setMobileDetail(false); }}>
-          <Users size={19} /><span>{t('clients')}</span>
+          <UserRound size={19} /><span>{t('clients')}</span>
         </button>
         <button type="button" className={mobileView === 'settings' ? 'active' : ''} onClick={() => { setMobileView('settings'); setMobileDetail(false); }}>
-          <Settings size={19} /><span>{t('settings')}</span>
+          <SlidersHorizontal size={19} /><span>{t('settings')}</span>
         </button>
       </nav>
-      <SessionFooter user={user} loginAt={loginAt} language={language} t={t} onLogout={() => persistUser(null)} />
+      <SessionFooter user={user} loginAt={loginAt} language={language} t={t} />
     </main>
     </div>
     </I18nContext.Provider>
   );
 }
 
-function NavRail({ t, onLogout, activeView, onSelectView }) {
+function AppHeader({ t, onLogout }) {
+  return (
+    <header className="app-header">
+      <div className="app-brand">
+        <span className="app-brand-mark">WL</span>
+        <span><strong>{t('appName')}</strong><small>{t('eyebrow')}</small></span>
+      </div>
+      <button type="button" className="app-header-logout" onClick={onLogout}><LogOut size={16} /> {t('logout')}</button>
+    </header>
+  );
+}
+
+function NavRail({ t, activeView, onSelectView }) {
   const items = [
-    { id: 'overview', icon: WalletCards, label: t('overview') },
-    { id: 'services', icon: ReceiptText, label: t('services') },
+    { id: 'overview', icon: LayoutDashboard, label: t('overview') },
+    { id: 'services', icon: BriefcaseBusiness, label: t('services') },
     { id: 'new', icon: Plus, label: t('newService') },
-    { id: 'clients', icon: Users, label: t('clients') },
-    { id: 'settings', icon: Settings, label: t('settings') }
+    { id: 'clients', icon: UserRound, label: t('clients') },
+    { id: 'settings', icon: SlidersHorizontal, label: t('settings') }
   ];
   return (
     <aside className="hidden lg:flex lg:sticky lg:top-0 lg:h-screen lg:w-[76px] lg:shrink-0 lg:flex-col lg:items-center lg:gap-2 lg:bg-[#0e211d] lg:py-5">
@@ -872,26 +888,18 @@ function NavRail({ t, onLogout, activeView, onSelectView }) {
             type="button"
             title={label}
             onClick={() => onSelectView(id)}
-            className={`flex w-14 flex-col items-center gap-1 rounded-lg border-0 py-2.5 shadow-none transition-colors hover:translate-y-0 hover:bg-white/10 hover:text-white hover:shadow-none ${activeView === id ? 'bg-white/10 text-white' : 'bg-transparent text-white/55'}`}
+            className={`group relative flex w-14 flex-col items-center gap-1 rounded-xl border-0 py-2.5 shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/10 hover:text-white hover:shadow-none ${activeView === id ? 'bg-white/12 text-white' : 'bg-transparent text-white/50'}`}
           >
-            <Icon size={18} />
+            <span className={`grid h-7 w-7 place-items-center rounded-lg transition-all duration-300 group-hover:scale-110 group-hover:bg-white/10 ${activeView === id ? 'bg-[#18a596] shadow-[0_6px_16px_rgba(24,165,150,.35)]' : ''}`}><Icon size={17} strokeWidth={2} /></span>
             <span className="text-center text-[9px] font-semibold leading-tight tracking-wide">{label}</span>
           </button>
         ))}
       </nav>
-      <button
-        type="button"
-        title={t('logout')}
-        onClick={onLogout}
-        className="mb-1 grid h-10 w-10 place-items-center rounded-lg border-0 bg-transparent text-white/55 shadow-none transition-colors hover:bg-white/10 hover:text-white hover:shadow-none hover:translate-y-0"
-      >
-        <LogOut size={17} />
-      </button>
     </aside>
   );
 }
 
-function SessionFooter({ user, loginAt, language, t, onLogout }) {
+function SessionFooter({ user, loginAt, language, t }) {
   const locale = language === 'en' ? 'en-US' : 'pt-BR';
   const loginDate = new Date(loginAt);
   const formattedLogin = Number.isNaN(loginDate.getTime())
@@ -908,7 +916,6 @@ function SessionFooter({ user, loginAt, language, t, onLogout }) {
         <span>{t('loginAt')}</span>
         <time dateTime={loginAt}>{formattedLogin}</time>
       </div>
-      <button type="button" className="secondary-button" onClick={onLogout}><LogOut size={15} /> {t('logout')}</button>
     </footer>
   );
 }
@@ -1524,7 +1531,6 @@ function ServiceDetail({ service, clients, run, busy }) {
       <PaymentForm service={service} run={run} busy={busy} />
       <EntriesTable service={service} run={run} busy={busy} />
       <PaymentsTable service={service} />
-      <GithubServicePanel service={service} run={run} busy={busy} />
 
       {receiptOpen ? (
         <Modal title={t('receiptTitle')} onClose={() => setReceiptOpen(false)}>
