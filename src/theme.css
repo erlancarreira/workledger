@@ -934,6 +934,214 @@ h3 {
   font-variant-numeric: tabular-nums;
 }
 
+.overview-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(300px, .75fr);
+  align-items: start;
+  gap: 18px;
+}
+
+.overview-main-column,
+.overview-side-column {
+  display: grid;
+  gap: 18px;
+}
+
+.overview-progress-panel,
+.overview-list-panel,
+.overview-actions-panel {
+  padding: 20px;
+}
+
+.overview-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.overview-section-heading > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-weight: 750;
+}
+
+.overview-section-heading > span svg {
+  color: var(--primary);
+}
+
+.overview-section-heading small {
+  display: grid;
+  min-width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--muted-strong);
+  background: var(--surface-muted);
+  font-size: .72rem;
+  font-weight: 700;
+}
+
+.overview-progress-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 18px;
+}
+
+.overview-progress-item {
+  display: grid;
+  gap: 8px;
+}
+
+.overview-progress-item > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.overview-progress-item strong {
+  font-family: var(--font-mono);
+  font-size: .82rem;
+}
+
+.overview-progress-item span,
+.overview-progress-item small {
+  color: var(--muted);
+  font-size: .72rem;
+}
+
+.overview-progress-track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--primary-soft);
+}
+
+.overview-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--primary), #25a99a);
+  transition: width 500ms ease;
+}
+
+.overview-service-list,
+.overview-outstanding-list {
+  display: grid;
+}
+
+.overview-service-row,
+.overview-outstanding-list button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  min-height: 0;
+  padding: 13px 4px;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  color: var(--text);
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.overview-service-row:last-child,
+.overview-outstanding-list button:last-child {
+  border-bottom: 0;
+}
+
+.overview-service-row:hover:not(:disabled),
+.overview-outstanding-list button:hover:not(:disabled) {
+  padding-inline: 10px;
+  color: var(--text);
+  background: var(--surface-muted);
+  box-shadow: none;
+  transform: none;
+}
+
+.overview-service-row > span,
+.overview-outstanding-list button > span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.overview-service-row > span:last-child {
+  display: flex;
+  align-items: center;
+  grid-auto-flow: column;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+
+.overview-service-row strong,
+.overview-outstanding-list strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overview-service-row small,
+.overview-outstanding-list small {
+  color: var(--muted);
+  font-size: .75rem;
+  font-weight: 500;
+}
+
+.overview-service-row b,
+.overview-outstanding-list b {
+  font-family: var(--font-mono);
+  font-size: .82rem;
+  white-space: nowrap;
+}
+
+.overview-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.overview-actions-grid button {
+  display: grid;
+  min-height: 88px;
+  align-content: center;
+  justify-items: start;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  color: var(--muted-strong);
+  background: var(--surface-muted);
+  box-shadow: none;
+  text-align: left;
+}
+
+.overview-actions-grid button svg {
+  color: var(--primary);
+}
+
+.overview-actions-grid button:hover:not(:disabled) {
+  border-color: #b5d8d2;
+  color: var(--primary-strong);
+  background: var(--primary-soft);
+  box-shadow: none;
+  transform: translateY(-2px);
+}
+
+.overview-actions-grid button span {
+  font-size: .76rem;
+  line-height: 1.2;
+}
+
+.overview-outstanding-list button {
+  padding-block: 12px;
+}
+
 .muted-value {
   color: #a3adb8 !important;
 }
@@ -2320,6 +2528,14 @@ h3 {
 }
 
 @media (max-width: 900px) {
+  .overview-content {
+    grid-template-columns: 1fr;
+  }
+
+  .overview-side-column {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .topbar,
   .detail-header {
     align-items: stretch;
@@ -2485,6 +2701,47 @@ h3 {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
+  }
+
+  .overview-content.mobile-active,
+  .overview-side-column {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .overview-content {
+    gap: 12px;
+  }
+
+  .overview-main-column,
+  .overview-side-column {
+    gap: 12px;
+  }
+
+  .overview-side-column {
+    grid-row: 1;
+  }
+
+  .overview-main-column {
+    grid-row: 2;
+  }
+
+  .overview-actions-panel {
+    grid-row: 1;
+  }
+
+  .overview-service-row {
+    align-items: flex-start;
+  }
+
+  .overview-service-row > span:last-child {
+    display: grid;
+    justify-items: end;
+    gap: 6px;
+  }
+
+  .overview-service-row > span:last-child svg {
+    display: none;
   }
 
   .stat-card {

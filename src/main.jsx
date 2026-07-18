@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { toBlob, toPng } from 'html-to-image';
 import {
   ArrowLeft,
+  ArrowRight,
+  AlertCircle,
   Banknote,
   BriefcaseBusiness,
   CalendarDays,
@@ -29,6 +31,7 @@ import {
   UserRound,
   Users,
   WalletCards,
+  Zap,
   X
 } from 'lucide-react';
 import './tailwind.css';
@@ -184,7 +187,14 @@ const messages = {
     settingsHelp: 'Defina o idioma e os padrões usados nos novos serviços.',
     launchDefaults: 'Padrões de lançamento',
     launchDefaultsHelp: 'Usados como padrão ao criar um novo serviço.',
-    loginAt: 'Login em'
+    loginAt: 'Login em',
+    quickActions: 'Ações rápidas',
+    recentServices: 'Serviços recentes',
+    openItems: 'Principais pendências',
+    financialProgress: 'Progresso financeiro',
+    received: 'recebido',
+    viewService: 'Abrir serviço',
+    registerPayment: 'Registrar pagamento'
   },
   en: {
     appName: 'WorkLedger',
@@ -336,7 +346,14 @@ const messages = {
     settingsHelp: 'Choose the language and defaults used for new services.',
     launchDefaults: 'Entry defaults',
     launchDefaultsHelp: 'Used as defaults when creating a new service.',
-    loginAt: 'Signed in at'
+    loginAt: 'Signed in at',
+    quickActions: 'Quick actions',
+    recentServices: 'Recent services',
+    openItems: 'Top outstanding items',
+    financialProgress: 'Financial progress',
+    received: 'received',
+    viewService: 'Open service',
+    registerPayment: 'Record payment'
   }
 };
 
@@ -804,6 +821,15 @@ function App() {
         </div>
       ) : null}
 
+      <OverviewContent
+        dashboard={dashboard}
+        language={language}
+        t={t}
+        active={mobileView === 'overview'}
+        onNavigate={(view) => { setMobileView(view); setMobileDetail(false); }}
+        onOpenService={(id) => { setSelectedId(id); setMobileView('services'); setMobileDetail(true); }}
+      />
+
       <div className={`mobile-pane ${mobileView === 'new' ? 'mobile-active' : ''}`}>
         <NewServiceForm dashboard={dashboard} run={run} busy={busy} onCreated={(id) => {
           setSelectedId(id);
@@ -867,6 +893,77 @@ function AppHeader({ t, onLogout }) {
       </div>
       <button type="button" className="app-header-logout" onClick={onLogout}><LogOut size={16} /> {t('logout')}</button>
     </header>
+  );
+}
+
+function OverviewContent({ dashboard, language, t, active, onNavigate, onOpenService }) {
+  const recentServices = dashboard.services.slice(0, 5);
+  const outstandingServices = [...dashboard.services]
+    .filter((service) => service.balanceCents > 0)
+    .sort((a, b) => b.balanceCents - a.balanceCents)
+    .slice(0, 4);
+  const currencies = Object.entries(dashboard.totals.byCurrency || {});
+
+  return (
+    <section className={`overview-content mobile-pane ${active ? 'mobile-active' : ''}`}>
+      <div className="overview-main-column">
+        <section className="panel overview-progress-panel">
+          <div className="overview-section-heading">
+            <span><WalletCards size={17} /> {t('financialProgress')}</span>
+          </div>
+          <div className="overview-progress-list">
+            {currencies.map(([currency, totals]) => {
+              const percentage = totals.totalCents > 0 ? Math.min(100, Math.round((totals.paidCents / totals.totalCents) * 100)) : 0;
+              return (
+                <div className="overview-progress-item" key={currency}>
+                  <div><strong>{currency}</strong><span>{percentage}% {t('received')}</span></div>
+                  <div className="overview-progress-track"><span style={{ width: `${percentage}%` }} /></div>
+                  <small>{centsToMoney(totals.paidCents, currency, language)} / {centsToMoney(totals.totalCents, currency, language)}</small>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="panel overview-list-panel">
+          <div className="overview-section-heading"><span><ReceiptText size={17} /> {t('recentServices')}</span><small>{recentServices.length}</small></div>
+          <div className="overview-service-list">
+            {recentServices.map((service) => (
+              <button type="button" key={service.id} className="overview-service-row" onClick={() => onOpenService(service.id)}>
+                <span><strong>{service.title}</strong><small>{clientLabel(service, t)} · {serviceDateLabel(service, t)}</small></span>
+                <span><StatusBadge status={service.status} /><b>{centsToMoney(service.balanceCents, service.currency, language)}</b><ArrowRight size={15} /></span>
+              </button>
+            ))}
+            {!recentServices.length ? <p className="empty-text">{t('noServices')}</p> : null}
+          </div>
+        </section>
+      </div>
+
+      <aside className="overview-side-column">
+        <section className="panel overview-actions-panel">
+          <div className="overview-section-heading"><span><Zap size={17} /> {t('quickActions')}</span></div>
+          <div className="overview-actions-grid">
+            <button type="button" onClick={() => onNavigate('new')}><Plus size={17} /><span>{t('newService')}</span></button>
+            <button type="button" onClick={() => onNavigate('clients')}><UserRound size={17} /><span>{t('addClient')}</span></button>
+            <button type="button" disabled={!dashboard.services.length} onClick={() => dashboard.services[0] && onOpenService(dashboard.services[0].id)}><Clock3 size={17} /><span>{t('logHours')}</span></button>
+            <button type="button" disabled={!outstandingServices.length} onClick={() => outstandingServices[0] && onOpenService(outstandingServices[0].id)}><Banknote size={17} /><span>{t('registerPayment')}</span></button>
+          </div>
+        </section>
+
+        <section className="panel overview-list-panel overview-outstanding-panel">
+          <div className="overview-section-heading"><span><AlertCircle size={17} /> {t('openItems')}</span><small>{outstandingServices.length}</small></div>
+          <div className="overview-outstanding-list">
+            {outstandingServices.map((service) => (
+              <button type="button" key={service.id} onClick={() => onOpenService(service.id)}>
+                <span><strong>{service.title}</strong><small>{clientLabel(service, t)}</small></span>
+                <b>{centsToMoney(service.balanceCents, service.currency, language)}</b>
+              </button>
+            ))}
+            {!outstandingServices.length ? <p className="empty-text">{t('noServices')}</p> : null}
+          </div>
+        </section>
+      </aside>
+    </section>
   );
 }
 
