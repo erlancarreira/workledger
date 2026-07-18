@@ -2455,7 +2455,7 @@ h3 {
   }
 
   .workspace {
-    grid-template-columns: 340px 420px minmax(0, 1fr);
+    grid-template-columns: 340px 440px minmax(0, 1fr);
   }
 
   .sidebar {
@@ -2473,7 +2473,29 @@ h3 {
     align-self: start;
     max-height: calc(100vh - 48px);
     overflow-y: auto;
+    overflow-x: hidden;
   }
+
+  .service-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+.desktop-tab-preferences .workspace-preferences {
+  grid-template-columns: 1fr;
+  margin: 0;
+}
+
+.desktop-tab-preferences .preferences-core {
+  grid-template-columns: 1fr;
+}
+
+.desktop-tab-preferences .github-preference-card {
+  grid-template-columns: 1fr;
+}
+
+.desktop-tab-preferences .github-preference-card > button {
+  width: 100%;
 }
 
 @media print {
