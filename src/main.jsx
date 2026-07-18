@@ -22,6 +22,7 @@ import {
   ReceiptText,
   Save,
   Send,
+  Settings,
   Trash2,
   Users,
   WalletCards,
@@ -175,7 +176,12 @@ const messages = {
     authSwitchRegister: 'Criar conta',
     authSwitchRecover: 'Esqueci minha senha',
     authHelp: 'Seus dados ficam protegidos na nuvem. O login salvo no navegador mantém sua sessão neste computador.',
-    signedAs: 'Conectado como'
+    signedAs: 'Conectado como',
+    settings: 'Configurações',
+    settingsHelp: 'Defina o idioma e os padrões usados nos novos serviços.',
+    launchDefaults: 'Padrões de lançamento',
+    launchDefaultsHelp: 'Usados como padrão ao criar um novo serviço.',
+    loginAt: 'Login em'
   },
   en: {
     appName: 'WorkLedger',
@@ -322,7 +328,12 @@ const messages = {
     authSwitchRegister: 'Create account',
     authSwitchRecover: 'Forgot password',
     authHelp: 'Your data is securely stored in the cloud. The browser-saved login keeps your session on this computer.',
-    signedAs: 'Signed in as'
+    signedAs: 'Signed in as',
+    settings: 'Settings',
+    settingsHelp: 'Choose the language and defaults used for new services.',
+    launchDefaults: 'Entry defaults',
+    launchDefaultsHelp: 'Used as defaults when creating a new service.',
+    loginAt: 'Signed in at'
   }
 };
 
@@ -632,6 +643,7 @@ function ClientPortal({ token }) {
 function App() {
   const [language, setLanguageState] = useState(() => localStorage.getItem('workledger-language') || 'pt');
   const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('workledger-user') || 'null'));
+  const [loginAt, setLoginAt] = useState(() => localStorage.getItem('workledger-login-at') || new Date().toISOString());
   const [dashboard, setDashboard] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   const [error, setError] = useState('');
@@ -649,9 +661,13 @@ function App() {
   function persistUser(nextUser) {
     setUser(nextUser);
     if (nextUser) {
+      const nextLoginAt = new Date().toISOString();
+      setLoginAt(nextLoginAt);
       localStorage.setItem('workledger-user', JSON.stringify(nextUser));
+      localStorage.setItem('workledger-login-at', nextLoginAt);
     } else {
       localStorage.removeItem('workledger-user');
+      localStorage.removeItem('workledger-login-at');
       setDashboard(null);
       setSelectedId(null);
     }
@@ -696,6 +712,12 @@ function App() {
   }, [user?.id]);
 
   useEffect(() => {
+    if (user && !localStorage.getItem('workledger-login-at')) {
+      localStorage.setItem('workledger-login-at', loginAt);
+    }
+  }, [user?.id, loginAt]);
+
+  useEffect(() => {
     const installationId = new URLSearchParams(window.location.search).get('github_installation_id');
     const connected = new URLSearchParams(window.location.search).get('github_connected');
     const githubError = new URLSearchParams(window.location.search).get('github_error');
@@ -735,27 +757,9 @@ function App() {
 
   return (
     <I18nContext.Provider value={{ language, setLanguage, t }}>
-    <div className="lg:flex">
+    <div className="min-h-screen lg:flex">
       <NavRail t={t} activeView={mobileView} onSelectView={(view) => { setMobileView(view); setMobileDetail(false); }} onLogout={() => persistUser(null)} />
-      <main className="app-shell lg:flex-1 lg:min-w-0 lg:px-10 lg:py-8 xl:px-14">
-      <header className="topbar lg:sticky lg:top-4 lg:z-10 lg:rounded-2xl lg:px-8 lg:py-7 lg:shadow-[0_20px_45px_-15px_rgba(15,23,42,0.4)]">
-        <div className="hero-copy">
-          <span className="product-mark">WL</span>
-          <div>
-            <p className="eyebrow">{t('eyebrow')}</p>
-            <h1>{t('title')}</h1>
-            <p className="subtitle">{t('subtitle')}</p>
-          </div>
-        </div>
-        <div className="topbar-tools">
-          <div className="session-card">
-            <span>{t('signedAs')}</span>
-            <strong>{user.name}</strong>
-            <button type="button" className="secondary-button" onClick={() => persistUser(null)}>{t('logout')}</button>
-          </div>
-          <LanguageSwitcher />
-        </div>
-      </header>
+      <main className="app-shell flex min-h-screen flex-col lg:flex-1 lg:min-w-0 lg:px-10 lg:py-8 xl:px-14">
 
       {error ? <div className="error">{error}</div> : null}
 
@@ -765,16 +769,28 @@ function App() {
         <StatCard tone="warning" icon={WalletCards} label={t('amountOutstanding')} value={currencySummary(dashboard.totals.byCurrency, 'openCents', language)} />
         <StatCard tone="neutral" icon={Clock3} label={t('workedHours')} value={minutesToLabel(dashboard.totals.workedMinutes)} />
       </section>
-      <section className={`workspace-preferences mobile-pane ${mobileView === 'overview' ? 'mobile-active' : ''}`} aria-label="Preferências de lançamento">
+      <section className={`settings-panel mobile-pane ${mobileView === 'settings' ? 'mobile-active' : ''}`} aria-label={t('settings')}>
+        <div className="panel settings-language-panel">
+          <div className="preferences-heading">
+            <span>{t('settings')}</span>
+            <small>{t('settingsHelp')}</small>
+          </div>
+          <label className="settings-language-field">
+            <span>{t('language')}</span>
+            <LanguageSwitcher />
+          </label>
+        </div>
+        <section className="workspace-preferences" aria-label="Preferências de lançamento">
         <div className="preferences-heading">
-          <span>Preferências de lançamento</span>
-          <small>Usadas como padrão ao criar um novo serviço.</small>
+          <span>{t('launchDefaults')}</span>
+          <small>{t('launchDefaultsHelp')}</small>
         </div>
         <div className="preferences-core">
           <DefaultClientEditor dashboard={dashboard} run={run} busy={busy} />
           <RateEditor dashboard={dashboard} run={run} busy={busy} />
         </div>
         <GithubDefaultRepositoryEditor dashboard={dashboard} run={run} busy={busy} />
+        </section>
       </section>
       {dashboard.settings.pending_carryover_cents > 0 ? (
         <div className={`carryover-notice mobile-pane ${mobileView === 'overview' ? 'mobile-active' : ''}`}>
@@ -827,7 +843,11 @@ function App() {
         <button type="button" className={mobileView === 'clients' ? 'active' : ''} onClick={() => { setMobileView('clients'); setMobileDetail(false); }}>
           <Users size={19} /><span>{t('clients')}</span>
         </button>
+        <button type="button" className={mobileView === 'settings' ? 'active' : ''} onClick={() => { setMobileView('settings'); setMobileDetail(false); }}>
+          <Settings size={19} /><span>{t('settings')}</span>
+        </button>
       </nav>
+      <SessionFooter user={user} loginAt={loginAt} language={language} t={t} onLogout={() => persistUser(null)} />
     </main>
     </div>
     </I18nContext.Provider>
@@ -839,7 +859,8 @@ function NavRail({ t, onLogout, activeView, onSelectView }) {
     { id: 'overview', icon: WalletCards, label: t('overview') },
     { id: 'services', icon: ReceiptText, label: t('services') },
     { id: 'new', icon: Plus, label: t('newService') },
-    { id: 'clients', icon: Users, label: t('clients') }
+    { id: 'clients', icon: Users, label: t('clients') },
+    { id: 'settings', icon: Settings, label: t('settings') }
   ];
   return (
     <aside className="hidden lg:flex lg:sticky lg:top-0 lg:h-screen lg:w-[76px] lg:shrink-0 lg:flex-col lg:items-center lg:gap-2 lg:bg-[#0e211d] lg:py-5">
@@ -867,6 +888,28 @@ function NavRail({ t, onLogout, activeView, onSelectView }) {
         <LogOut size={17} />
       </button>
     </aside>
+  );
+}
+
+function SessionFooter({ user, loginAt, language, t, onLogout }) {
+  const locale = language === 'en' ? 'en-US' : 'pt-BR';
+  const loginDate = new Date(loginAt);
+  const formattedLogin = Number.isNaN(loginDate.getTime())
+    ? '—'
+    : loginDate.toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' });
+
+  return (
+    <footer className="session-footer">
+      <div>
+        <span>{t('signedAs')}</span>
+        <strong>{user.name}</strong>
+      </div>
+      <div>
+        <span>{t('loginAt')}</span>
+        <time dateTime={loginAt}>{formattedLogin}</time>
+      </div>
+      <button type="button" className="secondary-button" onClick={onLogout}><LogOut size={15} /> {t('logout')}</button>
+    </footer>
   );
 }
 
