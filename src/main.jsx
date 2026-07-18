@@ -27,7 +27,6 @@ import {
   WalletCards,
   X
 } from 'lucide-react';
-import './styles.css';
 import './tailwind.css';
 
 const messages = {
@@ -639,7 +638,6 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [mobileView, setMobileView] = useState('services');
   const [mobileDetail, setMobileDetail] = useState(false);
-  const [desktopTab, setDesktopTab] = useState('new');
   const t = (key) => messages[language]?.[key] || messages.pt[key] || key;
   const portalToken = new URLSearchParams(window.location.search).get('client_portal');
 
@@ -738,7 +736,7 @@ function App() {
   return (
     <I18nContext.Provider value={{ language, setLanguage, t }}>
     <div className="lg:flex">
-      <NavRail t={t} onLogout={() => persistUser(null)} desktopTab={desktopTab} onSelectTab={setDesktopTab} />
+      <NavRail t={t} activeView={mobileView} onSelectView={(view) => { setMobileView(view); setMobileDetail(false); }} onLogout={() => persistUser(null)} />
       <main className="app-shell lg:flex-1 lg:min-w-0 lg:px-10 lg:py-8 xl:px-14">
       <header className="topbar lg:sticky lg:top-4 lg:z-10 lg:rounded-2xl lg:px-8 lg:py-7 lg:shadow-[0_20px_45px_-15px_rgba(15,23,42,0.4)]">
         <div className="hero-copy">
@@ -761,13 +759,13 @@ function App() {
 
       {error ? <div className="error">{error}</div> : null}
 
-      <section className={`stats-grid mobile-pane ${mobileView === 'overview' ? 'mobile-active' : ''}`} id="section-overview">
+      <section className={`stats-grid mobile-pane ${mobileView === 'overview' ? 'mobile-active' : ''}`}>
         <StatCard tone="neutral" icon={ReceiptText} label={t('amountBilled')} value={currencySummary(dashboard.totals.byCurrency, 'totalCents', language)} />
         <StatCard tone="success" icon={Banknote} label={t('amountPaid')} value={currencySummary(dashboard.totals.byCurrency, 'paidCents', language)} />
         <StatCard tone="warning" icon={WalletCards} label={t('amountOutstanding')} value={currencySummary(dashboard.totals.byCurrency, 'openCents', language)} />
         <StatCard tone="neutral" icon={Clock3} label={t('workedHours')} value={minutesToLabel(dashboard.totals.workedMinutes)} />
       </section>
-      <section className="workspace-preferences desktop-preferences lg:hidden" aria-label="Preferências de lançamento">
+      <section className={`workspace-preferences mobile-pane ${mobileView === 'overview' ? 'mobile-active' : ''}`} aria-label="Preferências de lançamento">
         <div className="preferences-heading">
           <span>Preferências de lançamento</span>
           <small>Usadas como padrão ao criar um novo serviço.</small>
@@ -778,11 +776,6 @@ function App() {
         </div>
         <GithubDefaultRepositoryEditor dashboard={dashboard} run={run} busy={busy} />
       </section>
-      <section className={`mobile-quick-settings mobile-pane ${mobileView === 'overview' ? 'mobile-active' : ''}`}>
-        <DefaultClientEditor dashboard={dashboard} run={run} busy={busy} />
-        <RateEditor dashboard={dashboard} run={run} busy={busy} />
-        <GithubDefaultRepositoryEditor dashboard={dashboard} run={run} busy={busy} />
-      </section>
       {dashboard.settings.pending_carryover_cents > 0 ? (
         <div className={`carryover-notice mobile-pane ${mobileView === 'overview' ? 'mobile-active' : ''}`}>
           <Hourglass size={16} />
@@ -791,78 +784,36 @@ function App() {
         </div>
       ) : null}
 
-      <div className="workspace">
-        <div id="desktop-tabs" className="hidden lg:flex lg:flex-col lg:gap-3">
-          <div className="flex gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
-            {[
-              { id: 'new', label: t('newService'), icon: Plus },
-              { id: 'clients', label: t('clients'), icon: Users },
-              { id: 'preferences', label: 'Preferências', icon: WalletCards }
-            ].map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setDesktopTab(id)}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg border-0 px-3 py-2 text-[13px] font-semibold shadow-none transition-colors hover:translate-y-0 hover:shadow-none ${desktopTab === id ? 'bg-slate-900 text-white hover:bg-slate-900' : 'bg-transparent text-slate-500 hover:bg-slate-100'}`}
-              >
-                <Icon size={14} /> {label}
-              </button>
-            ))}
-          </div>
-
-          <div className={desktopTab === 'new' ? 'block' : 'hidden'}>
-            <NewServiceForm dashboard={dashboard} run={run} busy={busy} onCreated={(id) => setSelectedId(id)} />
-          </div>
-          <div className={desktopTab === 'clients' ? 'block' : 'hidden'}>
-            <ClientManager clients={dashboard.clients} run={run} busy={busy} />
-          </div>
-          <div className={`desktop-tab-preferences ${desktopTab === 'preferences' ? 'block' : 'hidden'}`}>
-            <section className="workspace-preferences">
-              <div className="preferences-heading">
-                <span>Preferências de lançamento</span>
-                <small>Usadas como padrão ao criar um novo serviço.</small>
-              </div>
-              <div className="preferences-core">
-                <DefaultClientEditor dashboard={dashboard} run={run} busy={busy} />
-                <RateEditor dashboard={dashboard} run={run} busy={busy} />
-              </div>
-              <GithubDefaultRepositoryEditor dashboard={dashboard} run={run} busy={busy} />
-            </section>
-          </div>
-        </div>
-
-        <aside className="sidebar lg:hidden" id="section-new">
-          <div className={`mobile-pane ${mobileView === 'new' ? 'mobile-active' : ''}`}>
-            <NewServiceForm dashboard={dashboard} run={run} busy={busy} onCreated={(id) => {
-              setSelectedId(id);
-              setMobileView('services');
-              setMobileDetail(true);
-            }} />
-          </div>
-          <div className={`mobile-pane ${mobileView === 'clients' ? 'mobile-active' : ''}`} id="section-clients">
-            <ClientManager clients={dashboard.clients} run={run} busy={busy} />
-          </div>
-        </aside>
-
-        <section className={`detail-panel mobile-pane ${mobileView === 'services' ? 'mobile-active' : ''}`} id="section-services">
-          <div className={`mobile-service-list ${mobileDetail ? 'mobile-hidden' : ''}`}>
-            <ServiceList services={dashboard.services} selected={selected} onSelect={(id) => {
-              setSelectedId(id);
-              setMobileDetail(true);
-            }} />
-          </div>
-          <div className={`mobile-service-detail ${mobileDetail ? 'mobile-shown' : ''}`}>
-            <button type="button" className="mobile-back-button" onClick={() => setMobileDetail(false)}>
-              <ArrowLeft size={17} /> {t('backToServices')}
-            </button>
-            {selected ? (
-              <ServiceDetail service={selected} clients={dashboard.clients} run={run} busy={busy} />
-            ) : (
-              <div className="empty-state">{t('createFirst')}</div>
-            )}
-          </div>
-        </section>
+      <div className={`mobile-pane ${mobileView === 'new' ? 'mobile-active' : ''}`}>
+        <NewServiceForm dashboard={dashboard} run={run} busy={busy} onCreated={(id) => {
+          setSelectedId(id);
+          setMobileView('services');
+          setMobileDetail(true);
+        }} />
       </div>
+
+      <div className={`mobile-pane ${mobileView === 'clients' ? 'mobile-active' : ''}`}>
+        <ClientManager clients={dashboard.clients} run={run} busy={busy} />
+      </div>
+
+      <section className={`detail-panel mobile-pane ${mobileView === 'services' ? 'mobile-active' : ''}`}>
+        <div className={`mobile-service-list ${mobileDetail ? 'mobile-hidden' : ''}`}>
+          <ServiceList services={dashboard.services} selected={selected} onSelect={(id) => {
+            setSelectedId(id);
+            setMobileDetail(true);
+          }} />
+        </div>
+        <div className={`mobile-service-detail ${mobileDetail ? 'mobile-shown' : ''}`}>
+          <button type="button" className="mobile-back-button" onClick={() => setMobileDetail(false)}>
+            <ArrowLeft size={17} /> {t('backToServices')}
+          </button>
+          {selected ? (
+            <ServiceDetail service={selected} clients={dashboard.clients} run={run} busy={busy} />
+          ) : (
+            <div className="empty-state">{t('createFirst')}</div>
+          )}
+        </div>
+      </section>
       <nav className="mobile-nav" aria-label="Navegação principal">
         <button type="button" className={mobileView === 'overview' ? 'active' : ''} onClick={() => { setMobileView('overview'); setMobileDetail(false); }}>
           <WalletCards size={19} /><span>{t('overview')}</span>
@@ -883,32 +834,28 @@ function App() {
   );
 }
 
-function NavRail({ t, onLogout, desktopTab, onSelectTab }) {
+function NavRail({ t, onLogout, activeView, onSelectView }) {
   const items = [
-    { id: 'overview', href: '#section-overview', icon: WalletCards, label: t('overview') },
-    { id: 'services', href: '#section-services', icon: ReceiptText, label: t('services') },
-    { id: 'new', href: '#desktop-tabs', icon: Plus, label: t('newService'), tab: 'new' },
-    { id: 'clients', href: '#desktop-tabs', icon: Users, label: t('clients'), tab: 'clients' }
+    { id: 'overview', icon: WalletCards, label: t('overview') },
+    { id: 'services', icon: ReceiptText, label: t('services') },
+    { id: 'new', icon: Plus, label: t('newService') },
+    { id: 'clients', icon: Users, label: t('clients') }
   ];
   return (
     <aside className="hidden lg:flex lg:sticky lg:top-0 lg:h-screen lg:w-[76px] lg:shrink-0 lg:flex-col lg:items-center lg:gap-2 lg:bg-[#0e211d] lg:py-5">
       <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 font-serif text-sm font-bold text-white">WL</span>
       <nav className="mt-6 flex flex-1 flex-col items-center gap-1">
-        {items.map(({ id, href, icon: Icon, label, tab }) => (
-          <a
+        {items.map(({ id, icon: Icon, label }) => (
+          <button
             key={id}
-            href={href}
+            type="button"
             title={label}
-            onClick={tab ? (event) => {
-              event.preventDefault();
-              onSelectTab(tab);
-              document.getElementById('desktop-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            } : undefined}
-            className={`group flex w-14 flex-col items-center gap-1 rounded-lg py-2.5 no-underline transition-colors hover:bg-white/10 hover:text-white ${tab && desktopTab === tab ? 'bg-white/10 text-white' : 'text-white/55'}`}
+            onClick={() => onSelectView(id)}
+            className={`flex w-14 flex-col items-center gap-1 rounded-lg border-0 py-2.5 shadow-none transition-colors hover:translate-y-0 hover:bg-white/10 hover:text-white hover:shadow-none ${activeView === id ? 'bg-white/10 text-white' : 'bg-transparent text-white/55'}`}
           >
             <Icon size={18} />
             <span className="text-center text-[9px] font-semibold leading-tight tracking-wide">{label}</span>
-          </a>
+          </button>
         ))}
       </nav>
       <button
