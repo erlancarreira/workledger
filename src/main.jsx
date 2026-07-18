@@ -976,19 +976,19 @@ function NavRail({ t, activeView, onSelectView }) {
     { id: 'settings', icon: SlidersHorizontal, label: t('settings') }
   ];
   return (
-    <aside className="hidden lg:flex lg:sticky lg:top-0 lg:h-screen lg:w-[76px] lg:shrink-0 lg:flex-col lg:items-center lg:gap-2 lg:bg-[#0e211d] lg:py-5">
-      <span className="grid h-10 w-10 place-items-center rounded-xl bg-white/10 font-serif text-sm font-bold text-white">WL</span>
-      <nav className="mt-6 flex flex-1 flex-col items-center gap-1">
+    <aside className="hidden lg:flex lg:sticky lg:top-0 lg:h-screen lg:w-24 lg:shrink-0 lg:flex-col lg:items-center lg:bg-[#0e211d] lg:px-2 lg:py-5">
+      <span className="grid h-11 w-11 place-items-center rounded-xl border border-white/10 bg-white/10 font-serif text-sm font-bold text-white shadow-lg">WL</span>
+      <nav className="mt-7 flex flex-1 flex-col items-center gap-3">
         {items.map(({ id, icon: Icon, label }) => (
           <button
             key={id}
             type="button"
             title={label}
             onClick={() => onSelectView(id)}
-            className={`group relative flex w-14 flex-col items-center gap-1 rounded-xl border-0 py-2.5 shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/10 hover:text-white hover:shadow-none ${activeView === id ? 'bg-white/12 text-white' : 'bg-transparent text-white/50'}`}
+            className={`group relative flex w-20 flex-col items-center gap-1.5 rounded-xl border border-transparent py-3 shadow-none transition-all duration-300 hover:-translate-y-0.5 hover:border-white/10 hover:bg-white/10 hover:text-white hover:shadow-none ${activeView === id ? 'border-white/10 bg-white/12 text-white' : 'bg-transparent text-white/50'}`}
           >
             <span className={`grid h-7 w-7 place-items-center rounded-lg transition-all duration-300 group-hover:scale-110 group-hover:bg-white/10 ${activeView === id ? 'bg-[#18a596] shadow-[0_6px_16px_rgba(24,165,150,.35)]' : ''}`}><Icon size={17} strokeWidth={2} /></span>
-            <span className="text-center text-[9px] font-semibold leading-tight tracking-wide">{label}</span>
+            <span className="max-w-full text-center text-[9px] font-semibold leading-tight tracking-wide">{label}</span>
           </button>
         ))}
       </nav>
