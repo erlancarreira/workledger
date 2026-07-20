@@ -181,7 +181,7 @@ const messages = {
     authSwitchLogin: 'Já tenho conta',
     authSwitchRegister: 'Criar conta',
     authSwitchRecover: 'Esqueci minha senha',
-    authHelp: 'Seus dados ficam protegidos na nuvem. O login salvo no navegador mantém sua sessão neste computador.',
+    authHelp: 'Controle horas trabalhadas, clientes, serviços e pagamentos com segurança em um único painel.',
     signedAs: 'Conectado como',
     settings: 'Configurações',
     settingsHelp: 'Defina o idioma e os padrões usados nos novos serviços.',
@@ -340,7 +340,7 @@ const messages = {
     authSwitchLogin: 'I already have an account',
     authSwitchRegister: 'Create account',
     authSwitchRecover: 'Forgot password',
-    authHelp: 'Your data is securely stored in the cloud. The browser-saved login keeps your session on this computer.',
+    authHelp: 'Track hours, clients, services, and payments securely from one clear dashboard.',
     signedAs: 'Signed in as',
     settings: 'Settings',
     settingsHelp: 'Choose the language and defaults used for new services.',
@@ -518,11 +518,10 @@ function buildReceiptLines(service, t, language) {
 }
 
 async function api(path, options = {}) {
-  const storedUser = JSON.parse(localStorage.getItem('workledger-user') || 'null');
   const response = await fetch(path, {
+    credentials: 'same-origin',
     headers: {
       'Content-Type': 'application/json',
-      ...(storedUser?.id ? { 'x-user-id': String(storedUser.id) } : {}),
       ...(options.headers || {})
     },
     ...options
@@ -662,7 +661,7 @@ function ClientPortal({ token }) {
 
 function App() {
   const [language, setLanguageState] = useState(() => localStorage.getItem('workledger-language') || 'pt');
-  const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('workledger-user') || 'null'));
+  const [user, setUser] = useState(undefined);
   const [loginAt, setLoginAt] = useState(() => localStorage.getItem('workledger-login-at') || new Date().toISOString());
   const [dashboard, setDashboard] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
@@ -672,6 +671,17 @@ function App() {
   const [mobileDetail, setMobileDetail] = useState(false);
   const t = (key) => messages[language]?.[key] || messages.pt[key] || key;
   const portalToken = new URLSearchParams(window.location.search).get('client_portal');
+
+  useEffect(() => {
+    const canonicalUrl = `${window.location.origin}${window.location.pathname}`;
+    const isPrivateLink = Boolean(portalToken || new URLSearchParams(window.location.search).get('reset_token'));
+    document.documentElement.lang = language === 'en' ? 'en' : 'pt-BR';
+    document.querySelector('link[rel="canonical"]')?.setAttribute('href', canonicalUrl);
+    document.querySelector('meta[property="og:url"]')?.setAttribute('content', canonicalUrl);
+    document.querySelector('meta[property="og:image"]')?.setAttribute('content', `${window.location.origin}/social-card.png`);
+    document.querySelector('meta[name="twitter:image"]')?.setAttribute('content', `${window.location.origin}/social-card.png`);
+    document.querySelector('meta[name="robots"]')?.setAttribute('content', isPrivateLink ? 'noindex, nofollow, noarchive' : 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1');
+  }, [language, portalToken]);
 
   function setLanguage(nextLanguage) {
     setLanguageState(nextLanguage);
@@ -683,15 +693,20 @@ function App() {
     if (nextUser) {
       const nextLoginAt = new Date().toISOString();
       setLoginAt(nextLoginAt);
-      localStorage.setItem('workledger-user', JSON.stringify(nextUser));
       localStorage.setItem('workledger-login-at', nextLoginAt);
     } else {
-      localStorage.removeItem('workledger-user');
       localStorage.removeItem('workledger-login-at');
       setDashboard(null);
       setSelectedId(null);
     }
   }
+
+  useEffect(() => {
+    localStorage.removeItem('workledger-user');
+    api('/api/auth/me')
+      .then((data) => setUser(data.user))
+      .catch(() => setUser(null));
+  }, []);
 
   if (portalToken) {
     return (
@@ -763,6 +778,10 @@ function App() {
       .catch((err) => setError(err.message));
   }, [user?.id]);
 
+  if (user === undefined) {
+    return <main className="loading">{t('loading')}</main>;
+  }
+
   if (!user) {
     return (
       <I18nContext.Provider value={{ language, setLanguage, t }}>
@@ -780,7 +799,7 @@ function App() {
     <div className="min-h-screen lg:flex">
       <NavRail t={t} activeView={mobileView} onSelectView={(view) => { setMobileView(view); setMobileDetail(false); }} />
       <main className="app-shell flex min-h-screen flex-col lg:flex-1 lg:min-w-0 lg:px-10 lg:py-8 xl:px-14">
-      <AppHeader t={t} onLogout={() => persistUser(null)} />
+      <AppHeader t={t} onLogout={() => api('/api/auth/logout', { method: 'POST' }).finally(() => persistUser(null))} />
 
       {error ? <div className="error">{error}</div> : null}
 
@@ -888,7 +907,7 @@ function AppHeader({ t, onLogout }) {
   return (
     <header className="app-header">
       <div className="app-brand">
-        <span className="app-brand-mark">WL</span>
+        <img className="app-brand-logo" src="/favicon.svg" width="40" height="40" alt="" />
         <span><strong>{t('appName')}</strong><small>{t('eyebrow')}</small></span>
       </div>
       <button type="button" className="app-header-logout" onClick={onLogout}><LogOut size={16} /> {t('logout')}</button>
@@ -977,7 +996,7 @@ function NavRail({ t, activeView, onSelectView }) {
   ];
   return (
     <aside className="hidden lg:flex lg:sticky lg:top-0 lg:h-screen lg:w-24 lg:shrink-0 lg:flex-col lg:items-center lg:bg-[#0e211d] lg:px-2 lg:py-5">
-      <span className="grid h-11 w-11 place-items-center rounded-xl border border-white/10 bg-white/10 font-serif text-sm font-bold text-white shadow-lg">WL</span>
+      <img className="h-11 w-11 rounded-xl shadow-lg" src="/favicon.svg" width="44" height="44" alt="WorkLedger" />
       <nav className="mt-7 flex flex-1 flex-col items-center gap-3">
         {items.map(({ id, icon: Icon, label }) => (
           <button
@@ -1051,6 +1070,7 @@ function AuthScreen({ onAuth }) {
       const endpoint = mode === 'login' ? '/api/auth/login' : mode === 'register' ? '/api/auth/register' : '/api/auth/recover';
       const response = await fetch(endpoint, {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(mode === 'recover' ? { password: form.password, token: resetToken } : form)
       });
@@ -1070,7 +1090,7 @@ function AuthScreen({ onAuth }) {
       <div className="ledger-book">
         <section className="auth-hero">
           <span className="folio-mark" aria-hidden="true">N&ordm; 01</span>
-          <span className="product-mark">WL</span>
+          <img className="product-logo" src="/favicon.svg" width="64" height="64" alt="" />
           <p className="eyebrow">{t('eyebrow')}</p>
           <h1>{t('title')}</h1>
           <p className="subtitle">{t('authHelp')}</p>

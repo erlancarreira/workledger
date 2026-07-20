@@ -79,6 +79,13 @@ export function ensureSchema() {
       consumed_at TIMESTAMPTZ,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`;
+    await sql`CREATE TABLE IF NOT EXISTS user_sessions (
+      token_hash TEXT PRIMARY KEY,
+      user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at TIMESTAMPTZ NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`;
+    await sql`CREATE INDEX IF NOT EXISTS user_sessions_user_id_idx ON user_sessions (user_id)`;
     await sql`CREATE TABLE IF NOT EXISTS github_installations (
       id BIGSERIAL PRIMARY KEY,
       user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

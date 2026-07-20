@@ -11,6 +11,44 @@ import { getAppInstallations, getInstallation, getInstallationRepositories, getR
 const app = express();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
+const SESSION_COOKIE = 'workledger_session';
+const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+
+app.disable('x-powered-by');
+app.use((_req, res, next) => {
+  res.set({
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()'
+  });
+  next();
+});
+
+function cookies(req) {
+  return Object.fromEntries(String(req.headers.cookie || '').split(';').map((part) => part.trim().split('=').map(decodeURIComponent)).filter(([key]) => key));
+}
+
+function sessionHash(token) {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
+function setSessionCookie(res, token) {
+  const secure = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
+  res.append('Set-Cookie', `${SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_MAX_AGE_SECONDS}${secure ? '; Secure' : ''}`);
+}
+
+function clearSessionCookie(res) {
+  const secure = process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL);
+  res.append('Set-Cookie', `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${secure ? '; Secure' : ''}`);
+}
+
+async function createSession(userId, res) {
+  const token = crypto.randomBytes(32).toString('base64url');
+  await sql`DELETE FROM user_sessions WHERE expires_at <= NOW()`;
+  await sql`INSERT INTO user_sessions (token_hash,user_id,expires_at) VALUES (${sessionHash(token)},${userId},NOW() + INTERVAL '30 days')`;
+  setSessionCookie(res, token);
+}
 
 function callbackBaseUrl(req) {
   return process.env.GITHUB_CALLBACK_URL?.replace(/\/api\/github\/callback$/, '') || `${req.protocol}://${req.get('host')}`;
@@ -65,7 +103,7 @@ app.post('/api/github/webhook', express.raw({ type: 'application/json' }), async
   }
   res.status(202).json({ ok: true });
 }));
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
 app.get('/api/health', asyncRoute(async (_req, res) => {
   if (!databaseConfigured) return res.status(503).json({ ok: false, code: 'DATABASE_URL_MISSING' });
   await ensureSchema();
@@ -139,9 +177,9 @@ async function dashboardPayload(userId) {
 }
 
 const requireUser = asyncRoute(async (req, res, next) => {
-  const userId = Number(req.header('x-user-id'));
-  if (!Number.isInteger(userId) || userId <= 0) return res.status(401).json({ error: 'Login necessário.' });
-  const [user] = await sql`SELECT id, name, email FROM users WHERE id = ${userId}`;
+  const token = cookies(req)[SESSION_COOKIE];
+  if (!token) return res.status(401).json({ error: 'Login necessário.' });
+  const [user] = await sql`SELECT users.id,users.name,users.email FROM user_sessions JOIN users ON users.id=user_sessions.user_id WHERE user_sessions.token_hash=${sessionHash(token)} AND user_sessions.expires_at > NOW()`;
   if (!user) return res.status(401).json({ error: 'Usuário não encontrado.' });
   req.user = user; next();
 });
@@ -164,13 +202,24 @@ app.post('/api/auth/register', asyncRoute(async (req, res) => {
   const { hash, salt } = hashPassword(password);
   const [user] = await sql`INSERT INTO users (name,email,password_hash,password_salt) VALUES (${name},${email},${hash},${salt}) RETURNING id,name,email`;
   await ensureUserSettings(user.id);
+  await createSession(user.id, res);
   res.status(201).json({ user: publicUser(user) });
 }));
 app.post('/api/auth/login', asyncRoute(async (req, res) => {
   const email = String(req.body.email || '').trim().toLowerCase(), password = String(req.body.password || '');
   const [user] = await sql`SELECT * FROM users WHERE email = ${email}`;
-  if (!user || hashPassword(password, user.password_salt).hash !== user.password_hash) return res.status(401).json({ error: 'E-mail ou senha inválidos.' });
+  const suppliedHash = user ? hashPassword(password, user.password_salt).hash : hashPassword(password, '00000000000000000000000000000000').hash;
+  const valid = user && crypto.timingSafeEqual(Buffer.from(suppliedHash, 'hex'), Buffer.from(user.password_hash, 'hex'));
+  if (!valid) return res.status(401).json({ error: 'E-mail ou senha inválidos.' });
+  await createSession(user.id, res);
   res.json({ user: publicUser(user) });
+}));
+app.get('/api/auth/me', requireUser, (req, res) => res.json({ user: publicUser(req.user) }));
+app.post('/api/auth/logout', asyncRoute(async (req, res) => {
+  const token = cookies(req)[SESSION_COOKIE];
+  if (token) await sql`DELETE FROM user_sessions WHERE token_hash=${sessionHash(token)}`;
+  clearSessionCookie(res);
+  res.json({ ok: true });
 }));
 app.post('/api/auth/recover', asyncRoute(async (req, res) => {
   const token = String(req.body.token || ''), password = String(req.body.password || '');
@@ -188,6 +237,7 @@ app.post('/api/auth/recover', asyncRoute(async (req, res) => {
     FROM consumed WHERE users.id=consumed.user_id
     RETURNING users.id,users.name,users.email`;
   if (!rows[0]) return res.status(400).json({ error: 'Este link é inválido, expirou ou já foi utilizado.' });
+  await createSession(rows[0].id, res);
   res.json({ user: publicUser(rows[0]) });
 }));
 
