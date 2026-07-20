@@ -1039,9 +1039,9 @@ function SessionFooter({ user, loginAt, language, t }) {
 function LanguageSwitcher() {
   const { language, setLanguage, t } = useI18n();
   return (
-    <div className="language-switcher" aria-label={t('language')}>
-      <button type="button" className={language === 'pt' ? 'active' : ''} onClick={() => setLanguage('pt')}>{t('langPt')}</button>
-      <button type="button" className={language === 'en' ? 'active' : ''} onClick={() => setLanguage('en')}>{t('langEn')}</button>
+    <div className="language-switcher" role="group" aria-label={t('language')}>
+      <button type="button" aria-pressed={language === 'pt'} className={language === 'pt' ? 'active' : ''} onClick={() => setLanguage('pt')}>{t('langPt')}</button>
+      <button type="button" aria-pressed={language === 'en'} className={language === 'en' ? 'active' : ''} onClick={() => setLanguage('en')}>{t('langEn')}</button>
     </div>
   );
 }
@@ -1090,8 +1090,10 @@ function AuthScreen({ onAuth }) {
       <div className="ledger-book">
         <section className="auth-hero">
           <span className="folio-mark" aria-hidden="true">N&ordm; 01</span>
-          <img className="product-logo" src="/favicon.svg" width="64" height="64" alt="" />
-          <p className="eyebrow">{t('eyebrow')}</p>
+          <div className="auth-brand" aria-label="WorkLedger">
+            <img className="product-logo" src="/favicon.svg" width="72" height="72" alt="" />
+            <span><strong>WorkLedger</strong><small>{t('eyebrow')}</small></span>
+          </div>
           <h1>{t('title')}</h1>
           <p className="subtitle">{t('authHelp')}</p>
           <ul className="auth-hero-features">

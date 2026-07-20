@@ -1,7 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 72" role="img" aria-labelledby="title desc">
   <title id="title">WorkLedger</title><desc id="desc">Símbolo WL e nome WorkLedger</desc>
   <rect x="4" y="4" width="64" height="64" rx="15" fill="#0e211d"/>
-  <path d="M22 21v25c0 3.3 2.7 6 6 6h22" fill="none" stroke="#18a596" stroke-width="6" stroke-linecap="round"/>
-  <path d="m24 24 7 21 6-15 6 15 7-21" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M20 17h27a5 5 0 0 1 5 5v29a5 5 0 0 1-5 5H20z" fill="#f8fffd"/>
+  <path d="M20 17h7v39h-7z" fill="#18a596"/>
+  <path d="M33 27h12M33 34h9" stroke="#54716c" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="46" cy="46" r="10" fill="#18a596" stroke="#0e211d" stroke-width="2"/>
+  <path d="M46 40v6l4 3" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
   <text x="84" y="47" fill="#18212b" font-family="Work Sans,Arial,sans-serif" font-size="35" font-weight="700" letter-spacing="-1">WorkLedger</text>
 </svg>

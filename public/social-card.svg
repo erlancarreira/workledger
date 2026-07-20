@@ -7,9 +7,12 @@
   <rect width="1200" height="630" fill="url(#bg)"/>
   <circle cx="1080" cy="80" r="330" fill="#18a596" opacity=".08"/>
   <circle cx="100" cy="650" r="290" fill="#a16207" opacity=".08"/>
-  <rect x="82" y="80" width="106" height="106" rx="25" fill="#fff" opacity=".08" stroke="#fff" stroke-opacity=".18"/>
-  <path d="M111 111v42c0 6 5 11 11 11h39" fill="none" stroke="url(#accent)" stroke-width="9" stroke-linecap="round"/>
-  <path d="m114 116 11 35 10-25 10 25 12-35" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="82" y="80" width="106" height="106" rx="25" fill="#081c19" stroke="#fff" stroke-opacity=".12"/>
+  <path d="M108 101h44a8 8 0 0 1 8 8v48a8 8 0 0 1-8 8h-44z" fill="#f8fffd"/>
+  <path d="M108 101h12v64h-12z" fill="url(#accent)"/>
+  <path d="M130 119h20M130 131h15" stroke="#54716c" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="150" cy="151" r="17" fill="url(#accent)" stroke="#081c19" stroke-width="4"/>
+  <path d="M150 141v10l7 5" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
   <text x="82" y="275" fill="#fff" font-family="Arial,sans-serif" font-size="82" font-weight="700" letter-spacing="-3">WorkLedger</text>
   <text x="86" y="350" fill="#9ce2d8" font-family="Arial,sans-serif" font-size="30" font-weight="700" letter-spacing="4">CONTROLE FINANCEIRO POR HORA</text>
   <text x="86" y="430" fill="#dce8e6" font-family="Arial,sans-serif" font-size="34">Horas, clientes, serviços e pagamentos.</text>

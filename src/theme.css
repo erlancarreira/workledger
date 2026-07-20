@@ -223,11 +223,40 @@ h3 {
 
 .product-logo {
   display: block;
-  width: 64px;
-  height: 64px;
-  margin-bottom: 24px;
-  border-radius: 15px;
+  width: 72px;
+  height: 72px;
+  margin: 0;
+  border-radius: 18px;
   box-shadow: 0 16px 32px rgba(4, 20, 18, .2);
+}
+
+.auth-brand {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.auth-brand > span {
+  display: grid;
+  gap: 5px;
+}
+
+.auth-brand strong {
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.auth-brand small {
+  color: #9ce2d8;
+  font-size: .66rem;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
 }
 
 .app-brand > span:last-child {
@@ -810,6 +839,25 @@ h3 {
 .auth-card-header .language-switcher {
   width: max-content;
   flex: 0 0 auto;
+  border-color: var(--border);
+  background: var(--surface-muted);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .7);
+}
+
+.auth-card-header .language-switcher button {
+  min-width: 42px;
+  color: var(--muted-strong);
+}
+
+.auth-card-header .language-switcher button:hover:not(:disabled) {
+  color: var(--primary-strong);
+  background: var(--primary-soft);
+}
+
+.auth-card-header .language-switcher button.active {
+  color: #fff;
+  background: var(--primary);
+  box-shadow: 0 4px 10px rgba(15, 118, 110, .18);
 }
 
 .auth-card-header p {
